@@ -187,8 +187,8 @@ FFQVideoToGIF::FFQVideoToGIF(wxWindow* parent,wxWindowID id,const wxPoint& pos,c
 	sVal.SetRange(0, 100);
 	FrameRate->SetValidator(sVal);
 
-	FFQCFG()->SetBrowseRootFor(OpenFile);
-	FFQCFG()->SetBrowseRootFor(SaveFile);
+	//FFQCFG()->SetBrowseRootFor(OpenFile);
+	//FFQCFG()->SetBrowseRootFor(SaveFile);
 
 	FFQCFG()->SetCtrlColors(StartTime);
 	FFQCFG()->SetCtrlColors(LimitLen);
@@ -383,7 +383,7 @@ void FFQVideoToGIF::OnIdle(wxIdleEvent &event)
 
 //---------------------------------------------------------------------------------------
 
-bool BrowseFile(wxFileDialog *dlg, wxTextCtrl *ctl)
+/*bool BrowseFile(wxFileDialog *dlg, wxTextCtrl *ctl)
 {
 
     //Helper used to browse for a file
@@ -395,7 +395,7 @@ bool BrowseFile(wxFileDialog *dlg, wxTextCtrl *ctl)
     }
     return false;
 
-}
+}*/
 
 void FFQVideoToGIF::OnAction(wxCommandEvent& event)
 {
@@ -407,14 +407,17 @@ void FFQVideoToGIF::OnAction(wxCommandEvent& event)
     {
 
         //Browse source video
-        if (BrowseFile(OpenFile, Source) && (Dest->GetValue().Len() == 0))
+        if (FFQCFG()->FileDlgExecute("vid2gif.in", OpenFile, Source, true))
+            Dest->ChangeValue(Source->GetValue().BeforeLast('.') + ".gif");
+
+        /*if (BrowseFile(OpenFile, Source) && (Dest->GetValue().Len() == 0))
         {
 
             //Change value of Dest
             wxString s = Source->GetValue().BeforeLast('.');
             Dest->ChangeValue(s + ".gif");
 
-        }
+        }*/
 
     }
 
@@ -435,7 +438,8 @@ void FFQVideoToGIF::OnAction(wxCommandEvent& event)
     }
 
     //Browse destination file
-    else if (evtId == ID_BROWSEDST) BrowseFile(SaveFile, Dest);
+    //else if (evtId == ID_BROWSEDST) BrowseFile(SaveFile, Dest);
+    else if (evtId == ID_BROWSEDST) FFQCFG()->FileDlgExecute("vid2gif.out", SaveFile, Dest, true);
 
     else if (evtId == ID_OKBTN)
     {

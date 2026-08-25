@@ -31,6 +31,8 @@
 #include <wx/listbox.h>
 #include "FFQConst.h"
 
+extern const char HEXCHARS[];
+
 //Structure to define an FFQueue exception
 struct FFQError : std::exception
 {
@@ -58,12 +60,41 @@ template <typename T> void ThrowError(const T &error_msg)
     throw FFQError(str);
 }
 
+//Safe disable and re-enable sizers / controls
+class SizerDisabler
+{
+public:
+    SizerDisabler(wxSizer *sizer, const long *skip_ids = nullptr, const unsigned int skip_count = 0);
+    ~SizerDisabler();
+private:
+    wxSizer *m_Sizer;
+};
+
+//Safe delete and null objects
+#define DELETE_OBJ(ref) if (ref) { delete ref; ref=nullptr; }
+
+/*template <typename T> bool delete_obj(T &value)
+{
+    if (value)
+    {
+        delete value;
+        value = nullptr;
+        return true;
+    }
+    return false;
+}*/
+
 //Base64 related stuff
 size_t Base64DataLen(const wxString &base64);
 void Base64Unwrap(wxString &base64);
 void Base64Wrap(wxString &base64, size_t wrap_len);
 wxString StrFromBase64(wxString base64);
 wxString StrToBase64(const wxString &str, size_t wrapLen = 0);
+
+//Hex conversion
+long BufToHex(uint8_t* buf, unsigned int buflen, char* dest, unsigned int destlen);
+wxString BufToHexStr(uint8_t* buf, unsigned int buflen);
+long HexToBuf(const wxString &hex, uint8_t* buf, unsigned int buflen);
 
 //String conversion
 bool IsNumber(wxString value, bool allow_float = true);
@@ -91,6 +122,9 @@ wxString StrReplace(wxString where, wxString old_str, wxString new_str);
 bool     StrSplit(wxString &value, wxString &key, wxUniChar separator, bool trim = true);
 wxString StrTrim(wxString str);
 wxString Unescape(wxString str);
+
+//Find a name=value pair in an wxArrayString
+int IndexOfName(wxArrayString *as, wxString name);
 
 //Time and date related
 uint64_t GetTimeTickCount(wxLongLong *tick = NULL);
@@ -125,6 +159,6 @@ bool ForcePath(wxString path);
 void EnsureUniquePath(wxString &path);
 
 //Used to yield execution
-bool Yield_App(unsigned long sleep_millis = 0);
+bool Yield_App(unsigned long sleep_millis = 0, bool safe_yield = true);
 
 #endif // FFQMISC_H

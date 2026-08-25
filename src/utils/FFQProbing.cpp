@@ -144,7 +144,7 @@ FFProbeInfoParser::FFProbeInfoParser()
 {
 
      //Default constructor, clear values
-     m_Process = NULL;
+     m_Process = nullptr;
      Clear();
 
 }
@@ -155,8 +155,7 @@ FFProbeInfoParser::~FFProbeInfoParser()
 {
 
     //Release any memory used
-    if (m_Process) delete m_Process;
-    m_Process = NULL;
+    DELETE_OBJ(m_Process);
     Clear();
 
 }
@@ -187,6 +186,13 @@ LPFFPROBE_FILE_FORMAT FFProbeInfoParser::GetFormat()
     CheckValid();
     return &m_Format;
 
+}
+
+//---------------------------------------------------------------------------------------
+
+FFQProcess* FFProbeInfoParser::GetProcess()
+{
+    return m_Process;
 }
 
 //---------------------------------------------------------------------------------------
@@ -352,7 +358,7 @@ long FFProbeInfoParser::IndexOf(LPFFPROBE_STREAM_INFO StreamInfo)
 
 //---------------------------------------------------------------------------------------
 
-bool FFProbeInfoParser::RunFFProbe(wxString ForFile, wxString *ErrorMsg, bool ErrorToConsole)
+bool FFProbeInfoParser::RunFFProbe(wxString ForFile, wxString *ErrorMsg, bool ErrorToConsole, bool block_ui)
 {
 
     //Runs ffprobe on a specific file
@@ -367,7 +373,10 @@ bool FFProbeInfoParser::RunFFProbe(wxString ForFile, wxString *ErrorMsg, bool Er
     {
 
         //Run ffprobe on the file
-        m_Process->FFProbe(ForFile);
+        m_Process->FFProbe(ForFile, block_ui);
+
+        //If probing was aborted, we exit here
+        if (m_Process->WasAborted()) return false;
 
         //Get the output
         std_out = m_Process->GetProcessOutput(false, true);

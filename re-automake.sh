@@ -12,7 +12,7 @@ function remove() {
 }
 
 if [ -z "$(which autoreconf)" ]; then
-  echo Command "autoreconf" is not available, please install package "automake" to fix it.
+  echo Command "autoreconf" is not available, please install package "autoconf" to fix it.
   echo Nothing possible, exiting script..
   exit
 fi

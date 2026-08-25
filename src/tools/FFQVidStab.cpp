@@ -397,8 +397,8 @@ FFQVidStab::FFQVidStab(wxWindow* parent)
     Pages->SetPageText(1, FFQS(SID_VIDSTAB_2ND_PASS));
     Pages->SetPageText(2, FFQS(SID_VIDSTAB_OTHER_OPTIONS));
 
-	FFQCFG()->SetBrowseRootFor(OpenFileDlg);
-	FFQCFG()->SetBrowseRootFor(SaveFileDlg);
+	//FFQCFG()->SetBrowseRootFor(OpenFileDlg);
+	//FFQCFG()->SetBrowseRootFor(SaveFileDlg);
 
     //m_FirstExecute = true;
     m_LastPreset = "";
@@ -774,16 +774,18 @@ void FFQVidStab::OnAction(wxCommandEvent& event)
     if (evtId == ID_BROWSESRC)
     {
 
-        OpenFileDlg->SetPath(SrcFile->GetValue());
-        if (OpenFileDlg->ShowModal() != wxID_CANCEL) SrcFile->SetValue(OpenFileDlg->GetPath());
+        FFQCFG()->FileDlgExecute("vidstab.in", OpenFileDlg, SrcFile);
+        //OpenFileDlg->SetPath(SrcFile->GetValue());
+        //if (OpenFileDlg->ShowModal() != wxID_CANCEL) SrcFile->SetValue(OpenFileDlg->GetPath());
 
     }
 
     else if (evtId == ID_BROWSEDEST)
     {
 
-        SaveFileDlg->SetPath(DestFile->GetValue());
-        if (SaveFileDlg->ShowModal() != wxID_CANCEL) DestFile->SetValue(SaveFileDlg->GetPath());
+        FFQCFG()->FileDlgExecute("vidstab.out", SaveFileDlg, DestFile);
+        //SaveFileDlg->SetPath(DestFile->GetValue());
+        //if (SaveFileDlg->ShowModal() != wxID_CANCEL) DestFile->SetValue(SaveFileDlg->GetPath());
 
     }
 

@@ -1,5 +1,5 @@
 AC_PREREQ([2.69])
-AC_INIT([ffqueue], [1.7.69], [https://ffqueue.bruchhaus.dk/])
+AC_INIT([ffqueue], [1.7.71], [https://ffqueue.bruchhaus.dk/])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 AC_CONFIG_SRCDIR([src/FFQApp.cpp])
 AC_PROG_CXX
@@ -8,6 +8,9 @@ AS_IF([test -z $WXVER], [ AC_MSG_ERROR(["wx-config" was not found. To correct th
 AS_IF([test ${WXVER::3} -lt 302], [ AC_MSG_ERROR([wxWidgets must be at least version 3.0.2]) ], [])
 AC_CONFIG_FILES([Makefile src/Makefile])
 AC_CHECK_LIB([z], [compress2], [], [AC_MSG_ERROR([ZLib (libz) was not found!])])
+AC_CHECK_HEADER([zlib.h], [], [AC_MSG_ERROR([ZLib headers (libz-dev) was not found!])])
 AM_CONDITIONAL([FFQ_BASE_DIR],[test -f "res/MainLogo.png"])
+AC_ARG_ENABLE([xdg-install], [AS_HELP_STRING([--enable-xdg-install],[Enable or disable the use of xdg-utils to install icons and desktop files, default is enabled.])], [], [])
+AM_CONDITIONAL([FFQ_NO_XDG], [test x"$enable_xdg_install" = x"no"])
 LIBS="$LIBS `wx-config --libs` -lz"
 AC_OUTPUT

@@ -185,12 +185,14 @@ bool FilterBasePanel::BrowseForFile(wxString &file)
     if (m_FileDlg == NULL)
     {
         m_FileDlg = new wxFileDialog(this, FFQS(SID_COMMON_SELECT_FILE), wxEmptyString, wxEmptyString, wxFileSelectorDefaultWildcardStr, wxFD_OPEN|wxFD_FILE_MUST_EXIST);
-      	FFQCFG()->SetBrowseRootFor(m_FileDlg);
+      	//FFQCFG()->SetBrowseRootFor(m_FileDlg);
     }
-    m_FileDlg->SetPath(file);
+    return FFQCFG()->FileDlgExecute("filter", m_FileDlg, nullptr, false, &file);
+
+    /*m_FileDlg->SetPath(file);
     bool res = m_FileDlg->ShowModal() != wxID_CANCEL;
     if (res) file = m_FileDlg->GetPath();
-    return res;
+    return res;*/
 }
 
 //---------------------------------------------------------------------------------------

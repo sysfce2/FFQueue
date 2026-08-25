@@ -58,12 +58,33 @@
 
 //---------------------------------------------------------------------------------------
 
+#ifdef DEBUG
+class DummyProcess : public wxProcess
+{
+public:
+    DummyProcess(wxEvtHandler *parent)
+    {
+        Init(parent, wxID_ANY, wxPROCESS_DEFAULT);
+    }
+    virtual ~DummyProcess() override {
+        FFQProcess *parent = dynamic_cast<FFQProcess*>(GetNextHandler());
+        if (parent) parent->ProcessDestroy(this);
+        //wxProcess::~wxProcess();
+    }
+};
+#endif //DEBUG
+
+//---------------------------------------------------------------------------------------
+
 FFQProcess::FFQProcess()
 {
 
     //Default constructor - reset all
     m_Aborted = false;
     m_Waiting = false;
+    #ifdef HANDLE_KILLED
+    m_Killed = false;
+    #endif //HANDLE_KILLED
     m_Buffer = new char[READ_BUFFER_SIZE];
 
     m_CommandLine.Clear();
@@ -71,11 +92,14 @@ FFQProcess::FFQProcess()
     m_StdOut.Clear();
     m_FrameFile.Clear();
 
-    m_Process = NULL;
-    m_ProcessId = wxNewId();
+    m_Process = nullptr;
+    //m_WinLock = nullptr;
+    //m_StdIn   = nullptr;
+    //m_ProcessId = wxNewId();
 
     //Connect the event handler in order to handle terminate events
-    Connect(m_ProcessId, wxEVT_END_PROCESS, (wxObjectEventFunction)&FFQProcess::OnTerminate);
+    Bind(wxEVT_END_PROCESS, (wxObjectEventFunction)&FFQProcess::OnTerminate, this);
+    //Connect(m_ProcessId, wxEVT_END_PROCESS, (wxObjectEventFunction)&FFQProcess::OnTerminate);
 
 }
 
@@ -85,11 +109,11 @@ FFQProcess::~FFQProcess()
 {
 
     //Force abort to prevent hanging
-    Abort(false);
+    Abort(false, -2);
 
     //Release any occupied memory
     delete[] m_Buffer;
-    m_Buffer = NULL;
+    m_Buffer = nullptr;
 
     //Delete any temporary files
     if ((m_FrameFile.Len() > 0) && wxFileName::Exists(m_FrameFile)) wxRemoveFile(m_FrameFile);
@@ -102,7 +126,7 @@ bool FFQProcess::Abort(bool send_quit, int wait_timeout)
 {
 
     //If no process is running, exit
-    if (!IsProcessRunning()) return true;
+    if ( !IsProcessRunning() ) return true;
 
     //Signal aborted
     m_Aborted = true;
@@ -111,15 +135,31 @@ bool FFQProcess::Abort(bool send_quit, int wait_timeout)
     if (send_quit) m_Process->GetOutputStream()->PutC('q');
 
     //If not we kill the process the hard way!
-    else if (wxProcess::Kill(m_Process->GetPid(), wxSIGKILL) == wxKILL_OK) {
+    else if (wxProcess::Kill(m_Process->GetPid(), wxSIGKILL, wxKILL_CHILDREN) == wxKILL_OK)
+    {
 
-        //The terminate event is not called when the process is killed,
-        //so we must fake it here
-        wxProcessEvent event;
-        OnTerminate(event);
+        #ifdef HANDLE_KILLED
+        //When the process is killed, we must queue an event which
+        //will trigger OnTerminate in order to cleanup. If some parts
+        //of the code is waiting for the process to finish, queuing
+        //of the event is deferred to ::WaitFor
+
+        if (wait_timeout != -2)
+        {
+
+            //if wait_timeout is -2 then the object is being destroyed
+            //and any further handling should be prevented.
+            m_Killed = true;
+            if (!m_Waiting) QueueEvent(new wxProcessEvent());
+
+        }
+        #endif //HANDLE_KILLED
+
+        return true;
 
     }
 
+    //Unable to kill the process
     else ThrowError(FFQS(SID_KILL_FFMPEG_FAILED));
 
     //Wait for the terminate event until timeout
@@ -139,11 +179,42 @@ bool FFQProcess::WasAborted()
 
 //---------------------------------------------------------------------------------------
 
+bool FFQProcess::WriteToStdin(void *buf, unsigned int len, bool close)
+{
+    if (IsProcessRunning())
+    {
+        wxOutputStream *os = m_Process->GetOutputStream();
+        if (os)
+        {
+            os->Write(buf, len);
+            if (close) os->Close();
+            return true;
+        }
+    }
+    return false;
+}
+
+//---------------------------------------------------------------------------------------
+
+#ifdef DEBUG
+void FFQProcess::ProcessDestroy(wxProcess *ptr)
+{
+    FFQConsole *cs = FFQConsole::Get();
+    #ifdef HANDLE_KILLED
+    if (cs) cs->AppendLine(wxString::Format("ProcessDestroy: waiting=%i, killed=%i", (int)m_Waiting, (int)m_Killed), COLOR_RED);
+    #else
+    if (cs) cs->AppendLine(wxString::Format("ProcessDestroy: waiting=%i", (int)m_Waiting), COLOR_RED);
+    #endif //HANDLE_KILLED
+}
+#endif // DEBUG
+
+//---------------------------------------------------------------------------------------
+
 bool FFQProcess::IsProcessRunning()
 {
 
     //Returns true if a process is running
-    return (m_Process != NULL);
+    return (m_Process != nullptr);
 
 }
 
@@ -159,7 +230,7 @@ void FFQProcess::SetCommand(bool ffprobe, wxString args)
 
 //---------------------------------------------------------------------------------------
 
-void FFQProcess::SetCommand(wxString command, wxString args)
+void FFQProcess::SetCommand(wxString command, wxString args, bool quote_cmd)
 {
 
     //Ensure that the process is not already running
@@ -169,7 +240,7 @@ void FFQProcess::SetCommand(wxString command, wxString args)
     m_CommandLine = command;
 
     //If the path to command includes spaces it must be quoted
-    if ((m_CommandLine.Find(' ') >= 0) && (wxString("\"\'").Find(m_CommandLine.at(0)) < 0))
+    if (quote_cmd && (m_CommandLine.Find(' ') >= 0) && (wxString("\"\'").Find(m_CommandLine.at(0)) < 0))
         m_CommandLine = "\"" + m_CommandLine + "\"";
 
     //Append any arguments
@@ -207,7 +278,7 @@ bool FFQProcess::TransactPipes(bool in, bool err)
 
 //---------------------------------------------------------------------------------------
 
-bool FFQProcess::WaitFor(unsigned int timeout)
+bool FFQProcess::WaitFor(unsigned int timeout, bool block_ui)
 {
 
     //WARNING!! This method is dangerous! The yielding done with Yield_App
@@ -218,7 +289,7 @@ bool FFQProcess::WaitFor(unsigned int timeout)
     //milliseconds and return the result
 
     //A process must be running - else we might deadlock
-    //if (!IsProcessRunning()) return true;
+    if (!IsProcessRunning()) return true;
 
     if (m_Waiting)
     {
@@ -245,14 +316,25 @@ bool FFQProcess::WaitFor(unsigned int timeout)
         //prevent the process from hanging on a blocking
         //pipe call. If nothing is transacted we yield
         //in order to let the terminate event being received
-        if ((!to) && (!TransactPipes())) Yield_App(5);
+        if ((!to) && (!TransactPipes())) Yield_App(5, block_ui);
 
-    } while ((!m_Terminated) && (!to));
+    } while ((!m_Aborted) && (!m_Terminated) && (!to));
 
     m_Waiting = false;
 
+    #ifdef HANDLE_KILLED
+    if (m_Killed)
+    {
+
+        //If the process was killed whilst being waited for
+        //we must post an event to ensure proper cleanup.
+        QueueEvent(new wxProcessEvent());
+
+    }
+    #endif //HANDLE_KILLED
+
     //Return success
-    return m_Terminated;
+    return m_Terminated || m_Aborted;
 
 }
 
@@ -267,12 +349,19 @@ void FFQProcess::Execute(bool wait, bool redirect, bool final_transact)
     //Reset variables for the new process
     m_Terminated = false;
     m_Aborted = false;
-    //m_Waiting = wait;
+    #ifdef HANDLE_KILLED
+    m_Killed = false;
+    #endif //HANDLE_KILLED
+    m_ExitCode = 0;
     m_StdOut = "";
     m_ErrOut = "";
 
     //Create process with the correct id (for event filtering)
-    m_Process = new wxProcess(this, m_ProcessId);
+    #ifdef DEBUG
+    m_Process = new DummyProcess(this);
+    #else
+    m_Process = new wxProcess(this);
+    #endif //DEBUG
 
     //Redirect as required
     if (redirect) m_Process->Redirect();
@@ -280,34 +369,59 @@ void FFQProcess::Execute(bool wait, bool redirect, bool final_transact)
     //Set whether a final transaction should be performed
     m_FinalTransact = final_transact;
 
+    //Block input to windows during execution
+    //if (m_Blocking) m_WinLock = new wxWindowDisabler();
+
     //Execute the command
     long pid = wxExecute(m_CommandLine, wxEXEC_ASYNC | wxEXEC_MAKE_GROUP_LEADER, m_Process);
 
-    //Set time of start
-    m_StartTime = GetTimeTickCount();
+    /*if (redirect)
+    {
+        char buf[] = "Hello";
+        wxOutputStream *os = m_Process->GetOutputStream();
+        os->Write(buf, strlen(buf));
+        os->Close();
+    }*/
 
-    if (pid == 0)
+    /*if (m_Blocking)
     {
 
-        //Execution failed for some reason
-        delete m_Process;
-        m_Process = NULL;
-        ThrowError(FFQSF(SID_EXECUTE_COMMAND_ERROR, m_CommandLine));
+        //When blocking, we can finish up here
+        TransactPipes();
+        DELETE_OBJ(m_Process);
+        m_ExitCode = pid;
+        if (pid < 0) ThrowError(FFQSF(SID_EXECUTE_COMMAND_ERROR, m_CommandLine));
 
     }
+    else
+    {*/
 
-    //If we should wait for the process to finish we do so
-    if (wait) WaitFor();
+        //Set time of start
+        m_StartTime = GetTimeTickCount();
+
+        if (pid == 0)
+        {
+            //Execution failed for some reason
+            DELETE_OBJ(m_Process);
+            ThrowError(FFQSF(SID_EXECUTE_COMMAND_ERROR, m_CommandLine));
+        }
+
+        //If we should wait for the process to finish we do so
+        if (wait) WaitFor();
+
+    //}
 
 }
 
 //---------------------------------------------------------------------------------------
 
-void FFQProcess::ExecuteAndWait()
+void FFQProcess::ExecuteAndWait(bool block_ui)
 {
 
     //Execute a command and wait for it to finish
-    Execute(true, true);
+    //Execute(true, true);
+    Execute(false, true);
+    WaitFor(0, block_ui);
 
 }
 
@@ -451,14 +565,14 @@ bool FFQProcess::ExtractFrameFromFile(wxString file_name, TIME_VALUE frame_time,
 
 //---------------------------------------------------------------------------------------
 
-void FFQProcess::FFProbe(wxString input_file)
+void FFQProcess::FFProbe(wxString input_file, bool block_ui)
 {
 
     //Set the ffprobe command for the input file
     SetCommand(true, FFPROBE_ARGS + " \"" + input_file + "\"");
 
     //Execute and wait
-    ExecuteAndWait();
+    ExecuteAndWait(block_ui);
 
 }
 
@@ -680,6 +794,13 @@ wxString FFQProcess::ReadInputStream(wxInputStream *in)
 void FFQProcess::OnTerminate(wxProcessEvent& event)
 {
 
+    #ifdef DEBUG
+    FFQConsole::Get()->AppendLine(wxString::Format("OnTerminate, process=%lu, terminated=%i", (unsigned long)m_Process, (int)m_Terminated), COLOR_BLUE);
+    #endif // DEBUG
+
+    //Prevent the event from being handled twice
+    //if (m_Terminated) return;
+
     //We need to be safe of exceptions here since they might cause deadlock
     if (m_FinalTransact) try
     {
@@ -692,8 +813,10 @@ void FFQProcess::OnTerminate(wxProcessEvent& event)
     //Signal termination for any waiting operations
     m_Terminated = true;
 
+    //Grab exit code
+    m_ExitCode = event.GetExitCode();
+
     //Delete and null the process (makes IsProcessRunning() return false)
-    delete m_Process;
-    m_Process = NULL;
+    DELETE_OBJ(m_Process);
 
 }

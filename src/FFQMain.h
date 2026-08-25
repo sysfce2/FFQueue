@@ -120,6 +120,7 @@ class FFQMain: public wxFrame
         wxImageList *m_ListIcons, *m_ConsoleIcons;
         wxBitmap *m_ToolBitmaps;
         wxArrayPtrVoid *m_PtrList;
+        wxArrayString m_BatchFiles;
         FFQAbout* AboutBox; //About box - created when required
         FFQBatchMake* BatchMaker; //Used to batch-make jobs
         FFQThumbMake* ThumbMaker;

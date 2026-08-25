@@ -51,6 +51,7 @@
 #include "../FFQTimeEdit.h"
 #include "../utils/FFQProbing.h"
 #include "../utils/FFQToolJobs.h"
+#include "../FFQProgressDlg.h"
 #include <wx/hyperlink.h>
 
 typedef struct CONCAT_DATA {
@@ -66,7 +67,7 @@ typedef struct CONCAT_DATA {
 
 } CONCAT_DATA, *LPCONCAT_DATA;
 
-class FFQConcat: public wxDialog
+class FFQConcat: public wxDialog, public FFQProgressDlgReceiver
 {
 	public:
 
@@ -74,6 +75,9 @@ class FFQConcat: public wxDialog
 		virtual ~FFQConcat();
 		//void CleanupLast();
 		bool Execute(LPFFQ_CONCAT_JOB job);
+		void ProgressAbort();
+        bool ProgressStep(unsigned int step);
+
 		//bool Execute(wxString &command, wxString &saveLogFor, int PageID = 0);
 
 		//(*Declarations(FFQConcat)
@@ -201,17 +205,19 @@ class FFQConcat: public wxDialog
 		FFProbeInfoParser *m_PIP;
 
 		wxString m_ImgPatn, m_LastPst, m_Command, m_TempPath, m_MergeAspect;
+		wxArrayString *m_Paths, *m_Errors;
 		bool m_DoIdleTask, m_BlurOK, m_ImgList;
 		unsigned int m_ImgCount, m_ImgFirst;
 		TIME_VALUE m_LimitLen;
 		LPFFQ_CONCAT_JOB m_EditJob;
 		CONCAT_DATA m_AudInfo;
+		FFQProgressDlg* m_ProgressDlg;
 
 		void AddConcatSources(wxArrayString *paths);
 		void BuildMergeFilter(wxString &filter, wxString &smap, wxString &merge_aspect);
 		bool EditTime(TIME_VALUE &tv);
 		bool EnumSlideshowFrames();
-		bool GetFileInfo(LPCONCAT_DATA cd, bool dimensionRequired);
+		bool GetFileInfo(LPCONCAT_DATA cd, bool dimensionRequired, bool block_ui = true);
 		//bool MakeConcatCommand(wxString &cmd);
 		//bool MakeMergeCommand(wxString &cmd);
 		//bool MakeSlideshowCommand(wxString &cmd);

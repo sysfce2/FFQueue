@@ -139,6 +139,7 @@ const FFQ_SID SID_ADVANCED_CUTS_WARNING             = SID_BASIC_BASE + 95;
 const FFQ_SID SID_CONFIRM_SORT_PRESETS              = SID_BASIC_BASE + 96;
 const FFQ_SID SID_BAD_COMMAND_LINE_ARG              = SID_BASIC_BASE + 97;
 const FFQ_SID SID_RESET_TO_DEFAULT                  = SID_BASIC_BASE + 98;
+const FFQ_SID SID_RETRY_FAILED_BATCH                = SID_BASIC_BASE + 99;
 
 
 
@@ -218,6 +219,7 @@ const FFQ_SID SID_COMMON_ATTACHMENT                 = SID_COMMON_BASE + 32;
 const FFQ_SID SID_COMMON_DATA                       = SID_COMMON_BASE + 33;
 const FFQ_SID SID_COMMON_HELP                       = SID_COMMON_BASE + 34;
 const FFQ_SID SID_COMMON_RESET                      = SID_COMMON_BASE + 35;
+const FFQ_SID SID_COMMON_ABORT                      = SID_COMMON_BASE + 36;
 
 
 //Main frame UI
@@ -380,6 +382,8 @@ const FFQ_SID SID_CONCAT_PADDING                    = SID_CONCAT_BASE + 33;
 const FFQ_SID SID_CONCAT_LOOP_ERROR                 = SID_CONCAT_BASE + 34;
 const FFQ_SID SID_CONCAT_EXPLICIT_MAP               = SID_CONCAT_BASE + 35;
 const FFQ_SID SID_CONCAT_IMAGE_LIST_FOUND           = SID_CONCAT_BASE + 36;
+const FFQ_SID SID_CONCAT_PROBING_SOURCES            = SID_CONCAT_BASE + 37;
+const FFQ_SID SID_CONCAT_PROBING_FAILED             = SID_CONCAT_BASE + 38;
 
 
 //Preset editor UI
@@ -550,6 +554,7 @@ const FFQ_SID SID_OPTIONS_CONFIRM_DELETE_JOBS   = SID_OPTIONS_BASE + 22;
 const FFQ_SID SID_OPTIONS_PREVIEW_MAP_SUBS      = SID_OPTIONS_BASE + 23;
 const FFQ_SID SID_OPTIONS_NUM_ENCODING_SLOTS    = SID_OPTIONS_BASE + 24;
 const FFQ_SID SID_OPTIONS_DONT_SAVE_FFMPEG      = SID_OPTIONS_BASE + 25;
+const FFQ_SID SID_OPTIONS_SAVE_PATHS            = SID_OPTIONS_BASE + 26;
 
 
 //Thumb maker UI
@@ -649,6 +654,7 @@ const FFQ_SID SID_FULLSPEC_COLON_NOT_ALLOWED    = SID_FULLSPEC_BASE + 2;
 const FFQ_SID SID_FULLSPEC_TEST                 = SID_FULLSPEC_BASE + 3;
 const FFQ_SID SID_FULLSPEC_BAD_ID               = SID_FULLSPEC_BASE + 4;
 //const FFQ_SID SID_FULLSPEC_SELECT_FILE          = SID_FULLSPEC_BASE + 5;
+
 
 //Filter editor UI
 const FFQ_SID SID_FILTER_BASE                   = 30000;
@@ -1106,9 +1112,10 @@ typedef uint8_t STR_HASH[20];
 typedef uint8_t STR_FLAG;
 
 //Flags used with FFQ_STRING
-const STR_FLAG SF_STORED = 1; //The string is stored in file (if not the string is new)
-const STR_FLAG SF_MODIFIED = 2; //Set if the original string has been modified since last store
-const STR_FLAG SF_TRANSLATED = 4; //Set if the string has been translated
+const STR_FLAG SF_STORED     = 1 << 0; //The string is stored in file (if not the string is new)
+const STR_FLAG SF_MODIFIED   = 1 << 1; //Set if the original string has been modified since last store
+const STR_FLAG SF_TRANSLATED = 1 << 2; //Set if the string has been translated
+const STR_FLAG SF_EXTERNAL   = 1 << 3; //Set if the string was translated externally
 
 typedef struct FFQ_STRING
 {
@@ -1148,6 +1155,7 @@ class FFQLang
         wxString *QUEUE_STATUS_NAMES, *FILTER_NAMES, *TIME_VALUE_NAMES, *AUDIO_CHANNEL_NAMES;
 
         static FFQLang* GetInstance();
+        static FFQLang* GetInternal();
 
         FFQLang(bool loadFile = true);
         ~FFQLang();
@@ -1169,6 +1177,9 @@ class FFQLang
         const wxString& GetString(FFQ_SID sid);
         const wxString& GetDateTimeString();
         bool HasPassword();
+        long IndexOf(LPFFQ_STRING str);
+        long IndexOf(FFQ_SID id);
+        bool IsInternal();
         bool LoadLanguage();
         bool SaveLanguage();
         void SetDescription(wxString &desc);
@@ -1178,9 +1189,9 @@ class FFQLang
 
     private:
 
-        static FFQLang *m_Instance;
+        static FFQLang *m_Instance, *m_Internal;
 
-        unsigned int m_SkipCount;
+        unsigned int m_SkipCount, m_ModCount;
         STR_HASH m_PasswordHash;
         wxVector<LPFFQ_STRING> *m_Strings;
         wxString m_Description, m_Temp, m_DateTimeFmt, m_BadStrID, m_LoadName, m_FFQVersion;

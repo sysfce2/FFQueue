@@ -29,6 +29,7 @@
 #include "FFQHash.h"
 #include "../../version.h"
 
+
 #include <wx/filename.h>
 #include <wx/stdpaths.h>
 #include <wx/msgdlg.h>
@@ -36,7 +37,8 @@
 //---------------------------------------------------------------------------------------
 
 //Initialize statics
-FFQLang* FFQLang::m_Instance = NULL;
+FFQLang* FFQLang::m_Instance = nullptr;
+FFQLang* FFQLang::m_Internal = nullptr;
 const unsigned short FFQLang::TIME_VALUE_COUNT = 6;
 const unsigned short FFQLang::AUDIO_CHANNEL_COUNT = 25;
 
@@ -250,13 +252,24 @@ bool ShowWarning(wxWindow *focus, wxString msg)
 
 FFQLang* FFQLang::GetInstance()
 {
+    //Create the singleton as needed
+    if (m_Instance == nullptr) m_Instance = new FFQLang();
 
-    //Create the singleton if NULL
-    if (m_Instance == NULL) m_Instance = new FFQLang();
-
-    //Return singleton instance
+    //Return instance
     return m_Instance;
+}
 
+//---------------------------------------------------------------------------------------
+
+FFQLang* FFQLang::GetInternal()
+{
+    //Return the default instance if unmodified
+    FFQLang* lng = GetInstance();
+    if (lng->IsInternal()) return lng;
+
+    //Return a secondary, unmodified instance
+    if (m_Internal == nullptr) m_Internal = new FFQLang(false);
+    return m_Internal;
 }
 
 //---------------------------------------------------------------------------------------
@@ -372,6 +385,7 @@ FFQLang::FFQLang(bool loadFile)
     SetString(SID_CONFIRM_SORT_PRESETS,         "This will re-arrange all presets alphabetically, do you want to continue?");
     SetString(SID_BAD_COMMAND_LINE_ARG,         "The following command line argument is invalid: %s");
     SetString(SID_RESET_TO_DEFAULT,             "This will reset all specified values to default, do you want to continue?");
+    SetString(SID_RETRY_FAILED_BATCH,           "Do you want to retry with %u previously dry run or failed files?");
 
 
     //Log related messages
@@ -447,6 +461,7 @@ FFQLang::FFQLang(bool loadFile)
     SetString(SID_COMMON_DATA,                  "Data");
     SetString(SID_COMMON_HELP,                  "Help");
     SetString(SID_COMMON_RESET,                 "Reset");
+    SetString(SID_COMMON_ABORT,                 "Abort");
 
 
     //Main frame UI strings
@@ -525,7 +540,7 @@ FFQLang::FFQLang(bool loadFile)
     SetString(SID_JOBEDIT_ADV_ADD_SECONDARY,     "Find secondary files");
     SetString(SID_JOBEDIT_ADV_MORE,              "[MORE]");
     SetString(SID_JOBEDIT_ADV_INPUT_SETTINGS,    "Per file input settings");
-    SetString(SID_JOBEDIT_ADV_MORE_TOOLTIP,      "offset=%s\nframe rate=%s\nloop=%s\nflags=%s");
+    SetString(SID_JOBEDIT_ADV_MORE_TOOLTIP,      "offset=%s<br>frame rate=%s<br>loop=%s<br>flags=%s"); //"offset=%s\nframe rate=%s\nloop=%s\nflags=%s"
     SetString(SID_JOBEDIT_ADV_FRAMERATE_SWITCH,  "Force frame rate with -r rather than -framerate");
 
     SetString(SID_JOBEDIT_ADV_CUTS,              "[Adv. cuts]");
@@ -595,6 +610,8 @@ FFQLang::FFQLang(bool loadFile)
     SetString(SID_CONCAT_LOOP_ERROR,            "This job will encode forever; you must disable loop frames, specify an audio track or limit the length of the output to prevent this.");
     SetString(SID_CONCAT_EXPLICIT_MAP,          "Explicitly map all streams");
     SetString(SID_CONCAT_IMAGE_LIST_FOUND,      "Pre-generated list of images found");
+    SetString(SID_CONCAT_PROBING_SOURCES,       "Probing sources...");
+    SetString(SID_CONCAT_PROBING_FAILED,        "Probing failed for %u sources, please review the console for further info");
 
 
     //Preset editor UI strings
@@ -763,6 +780,7 @@ FFQLang::FFQLang(bool loadFile)
     SetString(SID_OPTIONS_PREVIEW_MAP_SUBS,         "Always map subtitles when previewing");
     SetString(SID_OPTIONS_NUM_ENCODING_SLOTS,       "Number of simultaneous jobs to process");
     SetString(SID_OPTIONS_DONT_SAVE_FFMPEG,         "Do not save FFmpeg capabilities for fast reload");
+    SetString(SID_OPTIONS_SAVE_PATHS,               "Remember file dialog paths between sessions");
 
 
     //Thumb maker UI strings
@@ -1379,6 +1397,7 @@ FFQLang::FFQLang(bool loadFile)
     m_DateTimeFmt = "";
     m_BadStrID = "";
     m_SkipCount = 0;
+    m_ModCount = 0;
     m_LoadName = "";
     m_FFQVersion = AutoVersion::FULLVERSION_STRING;
     memcpy(&m_PasswordHash, &NO_PASSWORD_HASH, sizeof(NO_PASSWORD_HASH));
@@ -1492,7 +1511,7 @@ LPFFQ_STRING FFQLang::FindString(FFQ_SID sid)
     }
 
     //Not found - return NULL
-    return NULL;
+    return nullptr;
 
 }
 
@@ -1638,7 +1657,7 @@ const wxString& FFQLang::GetString(FFQ_SID sid)
     //Return the string with the given string id
     LPFFQ_STRING ffqs = FindString(sid);
 
-    if (ffqs == NULL)
+    if (ffqs == nullptr)
     {
 
         //The string was not found, show message while debugging and crash otherwise
@@ -1694,6 +1713,39 @@ bool FFQLang::HasPassword()
 
 //---------------------------------------------------------------------------------------
 
+long FFQLang::IndexOf(LPFFQ_STRING str)
+{
+    long idx = 0;
+    for (wxVector<LPFFQ_STRING>::const_iterator ite = m_Strings->begin(); ite != m_Strings->end(); ite++)
+    {
+        if (*ite == str) return idx;
+        else idx++;
+    }
+    return -1;
+}
+
+//---------------------------------------------------------------------------------------
+
+long FFQLang::IndexOf(FFQ_SID id)
+{
+    long idx = 0;
+    for (wxVector<LPFFQ_STRING>::const_iterator ite = m_Strings->begin(); ite != m_Strings->end(); ite++)
+    {
+        if ((*ite)->sid == id) return idx;
+        else idx++;
+    }
+    return -1;
+}
+
+//---------------------------------------------------------------------------------------
+
+bool FFQLang::IsInternal()
+{
+    return (m_ModCount = 0);
+}
+
+//---------------------------------------------------------------------------------------
+
 bool FFQLang::LoadLanguage()
 {
 
@@ -1730,6 +1782,7 @@ bool FFQLang::LoadLanguage()
     }
 
     m_SkipCount = 0;
+    m_ModCount = 0;
     bool res = false;
 
     if (m_LoadName.Len() > 0) try
@@ -1804,7 +1857,11 @@ bool FFQLang::LoadLanguage()
             file->Read((void*)&ffqs->org_hash, sizeof(ffqs->org_hash));
 
             //Set the modified flag if hash has changed
-            if (!CMPHASH(&ffqs->str_hash, &ffqs->org_hash)) ffqs->flags |= SF_MODIFIED;
+            if (!CMPHASH(&ffqs->str_hash, &ffqs->org_hash))
+            {
+                ffqs->flags |= SF_MODIFIED;
+                m_ModCount++;
+            }
 
             //If translation is available, load it
             if ((ffqs->flags & SF_TRANSLATED) != 0) LoadString(file, ffqs->str, buffer, m_PasswordHash);

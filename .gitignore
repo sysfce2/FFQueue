@@ -19,6 +19,8 @@ locale/*
 autom4te.cache/*
 config.status
 config.log
+Makefile.in
+configure
 
 # CMake
 .deps/*

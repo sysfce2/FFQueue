@@ -289,7 +289,7 @@ FFQBatchMake::FFQBatchMake(wxWindow* parent,wxWindowID id)
 
     SetTitle(FFQS(SID_BATCHMAKE_TITLE));
 
-	m_Files = NULL;
+	m_Files = nullptr;
 	m_DoIdleTask = false;
 
 	/*wxString cc = FFQCFG()->GetFFMpegCodecs(ctAUDIO);
@@ -324,13 +324,16 @@ void FFQBatchMake::Clear(bool releaseJobPointers)
 
     //Clear jobs
     m_Jobs.clear();
+
+    //Clear fails
+    m_Fails.Clear();
 }
 
 //---------------------------------------------------------------------------------------
 
 bool FFQBatchMake::Execute()
 {
-    unsigned int c = (m_Files == NULL) ? 0 : m_Files->Count(), pc = FFQPresetMgr::Get()->GetPresetCount();
+    unsigned int c = (m_Files == nullptr) ? 0 : m_Files->Count(), pc = FFQPresetMgr::Get()->GetPresetCount();
 
     if ((c == 0) || (pc == 0)) return ShowError(NULL, FFQS(SID_NO_FILES_OR_NO_PRESET));
 
@@ -369,7 +372,13 @@ bool FFQBatchMake::Execute()
 
     bool res = (ShowModal() == wxOK);
 
-    m_Files = NULL;
+    if (m_ReturnFails)
+    {
+        m_Files->Clear();
+        for (unsigned int i = 0; i < m_Fails.Count(); i++) m_Files->Add(m_Fails[i]);
+    }
+
+    m_Files = nullptr;
 
     return res;
 
@@ -391,9 +400,11 @@ void* FFQBatchMake::GetJob(unsigned int index)
 
 //---------------------------------------------------------------------------------------
 
-void FFQBatchMake::SetFiles(wxArrayString *files)
+void FFQBatchMake::SetFiles(wxArrayString *files, bool return_failed_files)
 {
     m_Files = files;
+    m_Fails.Clear();
+    m_ReturnFails = return_failed_files;
 }
 
 //---------------------------------------------------------------------------------------
@@ -846,7 +857,11 @@ void FFQBatchMake::MakeJobs(bool dry_run)
                     }
 
                     //Else bug out on this one
-                    else LogLine("\t" + FFQSF(SID_DUPLICATE_JOB_FOR_OUTPUT, job->out), COLOR_RED);
+                    else
+                    {
+                        cur.Clear(); //Prevent this one from being added to fails
+                        LogLine("\t" + FFQSF(SID_DUPLICATE_JOB_FOR_OUTPUT, job->out), COLOR_RED);
+                    }
 
                 }
                 else
@@ -871,7 +886,7 @@ void FFQBatchMake::MakeJobs(bool dry_run)
                     {
                         //Add to list and set pointer to NULL to prevent deletion
                         m_Jobs.push_back(job);
-                        job = NULL;
+                        job = nullptr;
                     }
 
                 }
@@ -879,7 +894,11 @@ void FFQBatchMake::MakeJobs(bool dry_run)
             }
 
             //Free unused pointer
-            if (job != NULL) delete job;
+            if (job)
+            {
+                if (cur.Len() > 0) m_Fails.Add(cur);
+                delete job;
+            }
 
         }
 

@@ -106,7 +106,7 @@ FFQThumbMake::FFQThumbMake(wxWindow* parent)
 
 	SetTitle(FFQS(SID_THUMBS_TITLE));
 	m_Reset = true;
-	FFQCFG()->SetBrowseRootFor(FileDlg);
+	//FFQCFG()->SetBrowseRootFor(FileDlg);
 
 
 }
@@ -164,8 +164,11 @@ void FFQThumbMake::OnAction(wxCommandEvent& event)
 
     if (evtId == ID_BROWSEBUTTON)
     {
-        FileDlg->SetPath(InFile->GetValue());
-        if (FileDlg->ShowModal() != wxID_CANCEL) InFile->SetValue(FileDlg->GetPath());
+
+        FFQCFG()->FileDlgExecute("thumbs", FileDlg, InFile);
+        //FileDlg->SetPath(InFile->GetValue());
+        //if (FileDlg->ShowModal() != wxID_CANCEL) InFile->SetValue(FileDlg->GetPath());
+
     }
 
     else if (evtId == ID_CANCELBUTTON) EndModal(wxID_CANCEL);

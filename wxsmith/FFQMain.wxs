@@ -6,8 +6,8 @@
 		<handler function="OnClose" entry="EVT_CLOSE" />
 		<handler function="OnFrameResize" entry="EVT_SIZE" />
 		<object class="wxSplitterWindow" name="ID_SPLITTERWINDOW" variable="SplitterWindow" member="yes">
+			<minsize>100</minsize>
 			<pos>184,256</pos>
-			<minsize>100,100</minsize>
 			<style>wxSP_3D|wxALWAYS_SHOW_SB</style>
 			<object class="wxListView" name="ID_LISTVIEW" variable="ListView" member="yes">
 				<minsize>800,150d</minsize>

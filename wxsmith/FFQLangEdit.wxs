@@ -2,16 +2,17 @@
 <wxsmith>
 	<object class="wxFrame" name="FFQLangEdit">
 		<title>FFQueue language editor</title>
-		<size>800,600</size>
+		<centered>1</centered>
+		<minsize>1000,800</minsize>
 		<id_arg>0</id_arg>
-		<style>wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL</style>
+		<style>wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL|wxWANTS_CHARS</style>
 		<handler function="OnClose" entry="EVT_CLOSE" />
 		<object class="wxPanel" name="ID_TABPANEL" variable="TabPanel" member="yes">
-			<object class="wxFlexGridSizer" variable="FlexGridSizer1" member="no">
+			<object class="wxFlexGridSizer" variable="MainSizer" member="yes">
 				<cols>1</cols>
-				<rows>3</rows>
+				<rows>5</rows>
 				<growablecols>0</growablecols>
-				<growablerows>1</growablerows>
+				<growablerows>1,3</growablerows>
 				<object class="sizeritem">
 					<object class="wxStaticBoxSizer" variable="SBS1" member="no">
 						<label>Language information</label>
@@ -93,7 +94,33 @@
 						<style>wxLC_REPORT|wxLC_SINGLE_SEL|wxLC_NO_SORT_HEADER</style>
 						<handler function="OnListViewItemSelect" entry="EVT_LIST_ITEM_SELECTED" />
 					</object>
-					<flag>wxALL|wxEXPAND</flag>
+					<flag>wxTOP|wxLEFT|wxRIGHT|wxEXPAND</flag>
+					<border>5</border>
+					<option>2</option>
+				</object>
+				<object class="sizeritem">
+					<object class="wxFlexGridSizer" variable="FlexGridSizer5" member="no">
+						<cols>2</cols>
+						<rows>1</rows>
+						<growablecols>1</growablecols>
+						<object class="sizeritem">
+							<object class="wxStaticText" name="ID_STATICTEXT1" variable="StaticText1" member="yes">
+								<label>Filter:</label>
+							</object>
+							<flag>wxTOP|wxRIGHT|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL</flag>
+							<border>5</border>
+							<option>1</option>
+						</object>
+						<object class="sizeritem">
+							<object class="wxTextCtrl" name="ID_FILTERTEXT" variable="FilterText" member="yes">
+								<handler function="OnAction" entry="EVT_TEXT" />
+							</object>
+							<flag>wxTOP|wxLEFT|wxEXPAND</flag>
+							<border>5</border>
+							<option>1</option>
+						</object>
+					</object>
+					<flag>wxBOTTOM|wxLEFT|wxRIGHT|wxEXPAND</flag>
 					<border>5</border>
 					<option>1</option>
 				</object>
@@ -108,7 +135,6 @@
 								<growablerows>0</growablerows>
 								<object class="sizeritem">
 									<object class="wxTextCtrl" name="ID_STREDIT" variable="StrEdit" member="yes">
-										<size>-1,200</size>
 										<style>wxTE_PROCESS_ENTER|wxTE_MULTILINE|wxTE_DONTWRAP</style>
 									</object>
 									<flag>wxALL|wxEXPAND</flag>
@@ -125,7 +151,134 @@
 									<option>1</option>
 								</object>
 							</object>
-							<flag>wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL</flag>
+							<flag>wxALL|wxEXPAND</flag>
+							<border>3</border>
+							<option>1</option>
+						</object>
+					</object>
+					<flag>wxALL|wxEXPAND</flag>
+					<border>5</border>
+					<option>1</option>
+				</object>
+				<object class="sizeritem">
+					<object class="wxStaticBoxSizer" variable="SBS3" member="no">
+						<label>External translation</label>
+						<orient>wxVERTICAL</orient>
+						<object class="sizeritem">
+							<object class="wxFlexGridSizer" variable="FlexGridSizer8" member="no">
+								<cols>1</cols>
+								<rows>3</rows>
+								<growablecols>0</growablecols>
+								<object class="sizeritem">
+									<object class="wxFlexGridSizer" variable="FlexGridSizer6" member="no">
+										<cols>3</cols>
+										<rows>1</rows>
+										<growablecols>1</growablecols>
+										<object class="sizeritem">
+											<object class="wxStaticText" name="wxID_ANY" variable="ST5" member="no">
+												<label>Command:</label>
+											</object>
+											<flag>wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL</flag>
+											<border>3</border>
+											<option>1</option>
+										</object>
+										<object class="sizeritem">
+											<object class="wxTextCtrl" name="ID_EXTCMD" variable="ExtCmd" member="yes" />
+											<flag>wxALL|wxEXPAND</flag>
+											<border>3</border>
+											<option>1</option>
+										</object>
+										<object class="sizeritem">
+											<object class="wxButton" name="ID_EXTCMDBTN" variable="ExtCmdBtn" member="yes">
+												<label>E</label>
+												<extra_code>ExtCmdBtn-&gt;SetLabel(STR__EXT__CMD__BTN__EXEC);</extra_code>
+												<handler function="OnAction" entry="EVT_BUTTON" />
+											</object>
+											<flag>wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL</flag>
+											<border>3</border>
+											<option>1</option>
+										</object>
+									</object>
+									<flag>wxTOP|wxLEFT|wxRIGHT|wxEXPAND</flag>
+									<border>3</border>
+									<option>1</option>
+								</object>
+								<object class="sizeritem">
+									<object class="wxStaticLine" name="ID_STATICLINE1" variable="StaticLine1" member="yes">
+										<size>10,-1</size>
+									</object>
+									<flag>wxALL|wxEXPAND</flag>
+									<border>3</border>
+									<option>1</option>
+								</object>
+								<object class="sizeritem">
+									<object class="wxFlexGridSizer" variable="FlexGridSizer7" member="no">
+										<cols>7</cols>
+										<rows>2</rows>
+										<object class="sizeritem">
+											<object class="wxStaticText" name="ID_STATICTEXT2" variable="StaticText2" member="yes">
+												<label>Export:</label>
+											</object>
+											<flag>wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL</flag>
+											<border>3</border>
+											<option>1</option>
+										</object>
+										<object class="sizeritem">
+											<object class="wxRadioButton" name="ID_EXPINTERNAL" variable="ExpInternal" member="yes">
+												<label>Everything</label>
+												<selected>1</selected>
+											</object>
+											<flag>wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL</flag>
+											<border>3</border>
+											<option>1</option>
+										</object>
+										<object class="sizeritem">
+											<object class="wxRadioButton" name="ID_EXPNEW" variable="ExpNew" member="yes">
+												<label>Only untranslated &amp;&amp; modified</label>
+											</object>
+											<flag>wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL</flag>
+											<border>3</border>
+											<option>1</option>
+										</object>
+										<object class="sizeritem">
+											<object class="wxButton" name="ID_EXPFILE" variable="ExpFile" member="yes">
+												<label>Select file...</label>
+												<handler function="OnAction" entry="EVT_BUTTON" />
+											</object>
+											<flag>wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL</flag>
+											<border>5</border>
+											<option>1</option>
+										</object>
+										<object class="spacer">
+											<flag>wxALL|wxEXPAND</flag>
+											<border>5</border>
+											<option>1</option>
+											<size>25,-1</size>
+										</object>
+										<object class="sizeritem">
+											<object class="wxStaticText" name="ID_STATICTEXT3" variable="StaticText3" member="yes">
+												<label>Import:</label>
+											</object>
+											<flag>wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL</flag>
+											<border>3</border>
+											<option>1</option>
+										</object>
+										<object class="sizeritem">
+											<object class="wxButton" name="ID_IMPFILE" variable="ImpFile" member="yes">
+												<label>Select file...</label>
+												<handler function="OnAction" entry="EVT_BUTTON" />
+											</object>
+											<flag>wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL</flag>
+											<border>3</border>
+											<option>1</option>
+										</object>
+									</object>
+									<flag>wxBOTTOM|wxLEFT|wxRIGHT|wxEXPAND</flag>
+									<border>3</border>
+									<option>1</option>
+								</object>
+							</object>
+							<flag>wxALL|wxEXPAND</flag>
 							<border>3</border>
 							<option>1</option>
 						</object>
@@ -137,10 +290,22 @@
 			</object>
 		</object>
 		<object class="wxStatusBar" name="ID_SB" variable="SB" member="yes">
-			<fields>3</fields>
-			<widths>1,200,200</widths>
-			<styles>wxSB_NORMAL,wxSB_NORMAL,wxSB_NORMAL</styles>
+			<fields>4</fields>
+			<widths>1,-200,-200,-200</widths>
+			<styles>wxSB_NORMAL,wxSB_NORMAL,wxSB_NORMAL,wxSB_NORMAL</styles>
 			<style>wxST_SIZEGRIP</style>
+		</object>
+		<object class="wxTimer" name="ID_FILTERTIMER" variable="Timer" member="yes">
+			<oneshot>1</oneshot>
+			<handler function="OnFilterTimer" entry="EVT_TIMER" />
+		</object>
+		<object class="wxFileDialog" variable="SaveFile" member="yes">
+			<message>Export translation file</message>
+			<style>wxFD_SAVE</style>
+		</object>
+		<object class="wxFileDialog" variable="OpenFile" member="yes">
+			<message>Import translation file</message>
+			<style>wxFD_OPEN|wxFD_FILE_MUST_EXIST</style>
 		</object>
 	</object>
 </wxsmith>

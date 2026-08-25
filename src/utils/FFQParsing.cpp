@@ -42,6 +42,23 @@ const wxString& FFQParser::all()
 
 //---------------------------------------------------------------------------------------
 
+size_t FFQParser::count()
+{
+    size_t p = m_Pos, i = m_Index, res = 0;
+    m_Index = 0;
+    m_Pos = 0;
+    while (has_more())
+    {
+        res++;
+        next();
+    }
+    m_Index = i;
+    m_Pos = p;
+    return res;
+}
+
+//---------------------------------------------------------------------------------------
+
 bool FFQParser::done()
 {
 
@@ -93,6 +110,18 @@ size_t FFQParser::pos()
 
     //Return the current position
     return m_Pos;
+
+}
+
+//---------------------------------------------------------------------------------------
+
+void FFQParser::reset()
+{
+
+    //Reset to initial state
+    m_Last.Clear();
+    m_Index = 0;
+    m_Pos = 0;
 
 }
 

@@ -1,10 +1,14 @@
 SUBDIRS=src
 FFQ_BINARY=ffqueue
-FFQ_XDGVER=`xdg-icon-resource --version 2> /dev/null`
 if FFQ_BASE_DIR
 FFQ_RES=res
 else
 FFQ_RES=../res
+endif
+if FFQ_NO_XDG
+FFQ_XDGVER=""
+else
+FFQ_XDGVER=`xdg-icon-resource --version 2> /dev/null`
 endif
 FFQ_DEST=$(DESTDIR)$(prefix)/share
 FFQ_ICONDEST=$(FFQ_DEST)/icons/hicolor

@@ -34,6 +34,7 @@ LINKLIBS:=
 
 # List of objects to link
 OBJECTS:=\
+	$(MAKEROOT)/obj/FFQProgressDlg.o\
 	$(MAKEROOT)/obj/FFQAbout.o\
 	$(MAKEROOT)/obj/FFQApp.o\
 	$(MAKEROOT)/obj/FFQBatchMake.o\
@@ -186,6 +187,9 @@ $(MAKEBINARY): $(OBJECTS)
 	$(LINKER) $(LINKDIRS) -o $(MAKEBINARY) $(OBJECTS) $(LINKVARS) $(LINKLIBS)
 
 # Recipes to create the individual objects and resources
+$(MAKEROOT)/obj/FFQProgressDlg.o:
+	$(CXX) $(COMPVARS) $(COMPDIRS) -c "src/FFQProgressDlg.cpp" -o $@
+
 $(MAKEROOT)/obj/FFQAbout.o:
 	$(CXX) $(COMPVARS) $(COMPDIRS) -c "src/FFQAbout.cpp" -o $@
 

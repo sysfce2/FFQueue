@@ -2,7 +2,8 @@ bin_PROGRAMS=ffqueue
 ffqueue_CXXFLAGS=`wx-config --debug=no --cxxflags` -std=c++11 -include ../wx_pch.h
 ffqueue_LDFLAGS=-s
 ffqueue_LDADD=@LIBS@
-ffqueue_SOURCES=FFQAbout.cpp\
+ffqueue_SOURCES=FFQProgressDlg.cpp\
+	FFQAbout.cpp\
 	FFQApp.cpp\
 	FFQBatchMake.cpp\
 	FFQBitRatePanel.cpp\

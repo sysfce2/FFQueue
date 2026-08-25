@@ -29,6 +29,7 @@ class FFQParser
     public:
         FFQParser(const wxString &from_string) : m_Last(""), m_Str(from_string), m_Index(0), m_Pos(0) {};
         const wxString& all();
+        size_t count();
         bool done();
         wxString first();
         bool has_more();
@@ -36,6 +37,7 @@ class FFQParser
         wxString last();
         virtual wxString next() = 0;
         size_t pos();
+        void reset();
         wxString rest();
 
     protected:

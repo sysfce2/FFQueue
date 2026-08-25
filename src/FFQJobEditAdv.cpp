@@ -236,8 +236,8 @@ FFQJobEditAdv::FFQJobEditAdv(wxWindow* parent)
     FFQCFG()->SetCtrlColors(OutputLength);
     //m_Process = new FFQProcess();
 
-	FFQCFG()->SetBrowseRootFor(OpenFile);
-	FFQCFG()->SetBrowseRootFor(SaveFile);
+	//FFQCFG()->SetBrowseRootFor(OpenFile);
+	//FFQCFG()->SetBrowseRootFor(SaveFile);
 
 	//Connect(wxID_ANY, wxEVT_IDLE, (wxObjectEventFunction)&FFQJobEditAdv::OnIdle);
 	Bind(wxEVT_IDLE, &FFQJobEditAdv::OnIdle, this);
@@ -1463,14 +1463,21 @@ void FFQJobEditAdv::OnAction(wxCommandEvent& event)
 
         //Select a file for current input
         LPINPUT_CTRLS ctrls = GetCtrlData();
-        OpenFile->SetPath(ctrls->input->GetValue());
+        FFQCFG()->FileDlgExecute("job.in", OpenFile, ctrls->input, true);
+
+        /*
+        FFQCFG()->FileDlgBefore(FILE_OPEN, OpenFile, ctrls->input->GetValue());
+        //SetDlgPaths(OpenFile, ctrls->input->GetValue(), m_OpenDlgDir);
+
         if (OpenFile->ShowModal() != wxID_CANCEL)
         {
 
-            ctrls->input->ChangeValue(OpenFile->GetPath());
-            ctrls->input->SetFocus();
+            FFQCFG()->FileDlgAfter(FILE_OPEN, OpenFile, ctrls->input, true);
+            //GetDlgPaths(OpenFile, ctrls->input, true, m_OpenDlgDir);
+            //ctrls->input->SetFocus();
 
         }
+        */
 
 
     }
@@ -1480,7 +1487,18 @@ void FFQJobEditAdv::OnAction(wxCommandEvent& event)
 
         //Play input file with system default player
         LPINPUT_CTRLS ctrls = GetCtrlData();
-        wxLaunchDefaultApplication(ctrls->input->GetValue());
+        if (FFQCFG()->is_snap)
+        {
+            PLAYER_TYPE pt;
+            wxString cmd = FFQCFG()->GetFFPlayCommand(true, &pt);
+            if (pt == ptUNKNOWN) ShowError(nullptr, FFQS(SID_FFPLAY_NOT_FOUND));
+            else
+            {
+                cmd += " \"" + ctrls->input->GetValue() + "\"";
+                if (wxExecute(cmd) == 0) ShowError(nullptr, FFQSF(SID_EXECUTE_COMMAND_ERROR, cmd));
+            }
+        }
+        else wxLaunchDefaultApplication(ctrls->input->GetValue());
 
     }
 
@@ -1574,14 +1592,21 @@ void FFQJobEditAdv::OnAction(wxCommandEvent& event)
     {
 
         //Select a file for Output
-        SaveFile->SetPath(Output->GetValue());
+        FFQCFG()->FileDlgExecute("job.out", SaveFile, Output, false);
+
+        /*
+        //SetDlgPaths(SaveFile, Output->GetValue(), m_SaveDlgDir);
+        FFQCFG()->FileDlgBefore(FILE_SAVE, SaveFile, Output->GetValue());
+
         if (SaveFile->ShowModal() != wxID_CANCEL)
         {
 
-            Output->SetValue(SaveFile->GetPath());
-            Output->SetFocus();
+            //GetDlgPaths(SaveFile, Output, false, m_SaveDlgDir);
+            FFQCFG()->FileDlgAfter(FILE_SAVE, SaveFile, Output, false);
+            //Output->SetFocus();
 
         }
+        */
 
     }
 

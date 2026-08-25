@@ -30,6 +30,13 @@
 #include <wx/image.h>
 #include "FFQTimeValue.h"
 
+#ifdef DEBUG
+class DummyProcess;
+#endif //DEBUG
+
+//One of those pesky Friday night rabbit holes!
+//#define HANDLE_KILLED
+
 class FFQProcess : public wxEvtHandler
 {
 
@@ -40,9 +47,10 @@ class FFQProcess : public wxEvtHandler
 
         bool Abort(bool send_quit, int wait_timeout = -1);
         void Execute(bool wait, bool redirect, bool final_transact = true);
-        void ExecuteAndWait();
+        void ExecuteAndWait(bool block_ui = true);
         bool ExtractFrameFromFile(wxString file_name, TIME_VALUE frame_time, wxImage *img, unsigned int timeout = 0, unsigned int accuracy = 0, wxSize fit_to = wxDefaultSize);
-        void FFProbe(wxString input_file);
+        void FFProbe(wxString input_file, bool block_ui = true);
+        //long     GetExitCode();
         uint64_t GetRunningTimeMillis();
         uint64_t GetStartTimeMillis();
 		wxString GetFFMpegCodecs(wxString ff_path = "");
@@ -56,21 +64,30 @@ class FFQProcess : public wxEvtHandler
         wxString GetProcessOutputLine(bool error_out, bool clear = true);
         bool IsProcessRunning();
         void SetCommand(bool probe, wxString args);
-        void SetCommand(wxString command, wxString args);
+        void SetCommand(wxString command, wxString args, bool quote_cmd = true);
         bool TransactPipes(bool in = true, bool err = true);
-        bool WaitFor(unsigned int timeout = 0);
+        bool WaitFor(unsigned int timeout = 0, bool block_ui = true);
         bool WasAborted();
+        bool WriteToStdin(void *buf, unsigned int len, bool close = true);
 
     protected:
 
+        #ifdef DEBUG
+        void ProcessDestroy(wxProcess *ptr);
+        friend class DummyProcess;
+        #endif //DEBUG
+
     private:
 
-        bool        m_Aborted, m_Terminated, m_Waiting, m_FinalTransact;
-        char        *m_Buffer;
-        wxString    m_CommandLine, m_ErrOut, m_StdOut, m_FrameFile;
-        wxProcess   *m_Process;
-        long        m_ProcessId;
-        uint64_t    m_StartTime;
+        bool           m_Aborted, m_Terminated, m_Waiting, m_FinalTransact;
+        #ifdef HANDLE_KILLED
+        bool           m_Killed;
+        #endif //HANDLE_KILLED
+        char           *m_Buffer;
+        wxString       m_CommandLine, m_ErrOut, m_StdOut, m_FrameFile;
+        wxProcess      *m_Process;
+        long           m_ExitCode;
+        uint64_t       m_StartTime;
 
         wxString ExecArgAndGetResult(wxString arg, wxString ff_path = "", bool prepend_err_out = false);
         wxString ReadInputStream(wxInputStream *in);

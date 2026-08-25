@@ -76,13 +76,14 @@ class FFProbeInfoParser
         ~FFProbeInfoParser();
         LPFFPROBE_STREAM_INFO FindStreamByCodecType(wxString codec_type);
         LPFFPROBE_FILE_FORMAT GetFormat();
+        FFQProcess* GetProcess();
         LPFFPROBE_STREAM_INFO GetStreamInfo(unsigned int StreamIndex);
         unsigned int GetStreamCount();
         bool GetDuration(TIME_VALUE &Time);
         bool GetVideoDimension(unsigned int &Width, unsigned int &Height);
         bool GetVideoRate(double &rate);
         long IndexOf(LPFFPROBE_STREAM_INFO StreamInfo);
-        bool RunFFProbe(wxString ForFile, wxString *ErrorMsg = NULL, bool ErrorToConsole = false);
+        bool RunFFProbe(wxString ForFile, wxString *ErrorMsg = nullptr, bool ErrorToConsole = false, bool block_ui = true);
         bool SetProbeOutput(wxString ProbeOutput);
 
     private:

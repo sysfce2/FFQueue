@@ -214,7 +214,7 @@ FFQMain::FFQMain(wxWindow* parent, wxWindowID id)
     Create(parent, id, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_STYLE, _T("id"));
     SetClientSize(wxSize(800,500));
     SplitterWindow = new wxSplitterWindow(this, ID_SPLITTERWINDOW, wxPoint(184,256), wxDefaultSize, wxSP_3D|wxALWAYS_SHOW_SB, _T("ID_SPLITTERWINDOW"));
-    SplitterWindow->SetMinSize(wxSize(100,100));
+    SplitterWindow->SetMinimumPaneSize(100);
     SplitterWindow->SetSashGravity(0.5);
     ListView = new wxListView(SplitterWindow, ID_LISTVIEW, wxDefaultPosition, wxDefaultSize, wxLC_REPORT|wxLC_NO_SORT_HEADER|wxBORDER_NONE, wxDefaultValidator, _T("ID_LISTVIEW"));
     ListView->SetMinSize(wxDLG_UNIT(SplitterWindow,wxSize(800,150)));
@@ -230,8 +230,6 @@ FFQMain::FFQMain(wxWindow* parent, wxWindowID id)
     TextCtrl->SetFont(TextCtrlFont);
     FlexGridSizer2->Add(TextCtrl, 0, wxEXPAND, 5);
     Panel1->SetSizer(FlexGridSizer2);
-    FlexGridSizer2->Fit(Panel1);
-    FlexGridSizer2->SetSizeHints(Panel1);
     Consoles->AddPage(Panel1, _("Sys"), false);
     SplitterWindow->SplitHorizontally(ListView, Consoles);
     StatusBar = new wxStatusBar(this, ID_STATUSBAR, wxST_SIZEGRIP|wxBORDER_NONE, _T("ID_STATUSBAR"));
@@ -450,7 +448,7 @@ FFQMain::FFQMain(wxWindow* parent, wxWindowID id)
 
     Consoles->SetPageText(0, FFQS(SID_MAINFRAME_NB_DEFAULT));
 
-	FFQCFG()->SetBrowseRootFor(OpenFilesDlg);
+	//FFQCFG()->SetBrowseRootFor(OpenFilesDlg);
 
     m_JobsFileName = FFQCFG()->app_name.Lower() + ".job";
 
@@ -466,6 +464,7 @@ FFQMain::FFQMain(wxWindow* parent, wxWindowID id)
     #ifdef __WINDOWS__
     SetIcon(wxIcon("aaaa", wxBITMAP_TYPE_ICO_RESOURCE));
     #else
+    //!!! FJERN XPM !!!
     SetIcon(wxIcon(MainIcon32_XPM));
     #endif // __WINDOWS__
 
@@ -477,6 +476,7 @@ FFQMain::~FFQMain()
 {
 
     //(*Destroy(FFQMain)
+    OpenFilesDlg->Destroy();
     //*)
 
     if (AboutBox)
@@ -2126,7 +2126,7 @@ void FFQMain::BatchMakeJobs(wxArrayString *files, bool releaseFilesPtr)
     else
     {
         if (BatchMaker == NULL) BatchMaker = new FFQBatchMake(this);
-        BatchMaker->SetFiles(files);
+        BatchMaker->SetFiles(files, true);
         if (BatchMaker->Execute())
         {
 
@@ -2304,8 +2304,16 @@ void FFQMain::OnDropFiles(wxDropFilesEvent& event)
     wxString* fl = event.GetFiles();//, s;
     if (fl == NULL) return;
 
+    m_BatchFiles.Clear();
+    for (int i = 0; i < event.GetNumberOfFiles(); i++)
+    {
+        //Let batch-maker expand the paths
+        m_BatchFiles.Add(fl[i]);
+    }
+    BatchMakeJobs(&m_BatchFiles, false);
+
     //Convert files to an array
-    wxArrayString* files = new wxArrayString();
+    /*wxArrayString* files = new wxArrayString();
     for (int i = 0; i < event.GetNumberOfFiles(); i++)
     {
         //Let batch-maker expand the paths
@@ -2313,7 +2321,7 @@ void FFQMain::OnDropFiles(wxDropFilesEvent& event)
     }
 
     //Launch the batch maker
-    BatchMakeJobs(files, true);
+    BatchMakeJobs(files, true);*/
 
 }
 
@@ -2598,12 +2606,18 @@ void FFQMain::OnToolBarButtonClick(wxCommandEvent& event)
     else if (evtId == ID_TOOLBARBATCH)
     {
 
-        if (OpenFilesDlg->ShowModal() != wxID_CANCEL)
+        bool retry = ((m_BatchFiles.Count() > 0) && DoConfirm(ListView, FFQSF(SID_RETRY_FAILED_BATCH, m_BatchFiles.Count())));
+        if (!retry) m_BatchFiles.Clear();
+
+        if (retry || FFQCFG()->FileDlgExecute("main.batch", OpenFilesDlg, nullptr))
         {
 
-            wxArrayString *files = new wxArrayString();
-            OpenFilesDlg->GetPaths(*files);
-            BatchMakeJobs(files, true);
+            if (!retry) OpenFilesDlg->GetPaths(m_BatchFiles);
+            BatchMakeJobs(&m_BatchFiles, false);
+
+            //wxArrayString *files = new wxArrayString();
+            //OpenFilesDlg->GetPaths(*files);
+            //BatchMakeJobs(files, true);
 
         }
 
@@ -2999,7 +3013,6 @@ void FFQMain::OnToolBarButtonClick(wxCommandEvent& event)
         delete job;
         delete jea;
         */
-
 
         FFQFilterEdit *fe = new FFQFilterEdit(this);
         FFMPEG_FILTER fltr = FFMPEG_FILTER();

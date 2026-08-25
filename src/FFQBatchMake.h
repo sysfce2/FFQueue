@@ -60,7 +60,7 @@ class FFQBatchMake: public wxDialog
 		bool Execute();
 		unsigned int GetJobCount();
 		void* GetJob(unsigned int index);
-		void SetFiles(wxArrayString *files);
+		void SetFiles(wxArrayString *files, bool return_failed_files);
 
 		//(*Declarations(FFQBatchMake)
 		FFQPresetPanel* Preset;
@@ -142,9 +142,9 @@ class FFQBatchMake: public wxDialog
 		void OnClose(wxCloseEvent& event);
 		//*)
 
-		wxArrayString* m_Files;
+		wxArrayString *m_Files, m_Fails;
 		wxVector<void*> m_Jobs;
-		bool m_ClearLog, m_Making, m_Abort, m_DoIdleTask;
+		bool m_ClearLog, m_Making, m_Abort, m_DoIdleTask, m_ReturnFails;
 		long m_VidIdx, m_AudIdx, m_SubsIdx;
 		std::vector<LPFFPROBE_STREAM_INFO> m_StreamInf;
 		wxString m_FindAud, m_FindSubs;

@@ -1186,7 +1186,7 @@ FFQPresetEdit::FFQPresetEdit(wxWindow* parent)
     Bind(wxEVT_SHOW, &FFQPresetEdit::OnShow, this);
     Bind(wxEVT_IDLE, &FFQPresetEdit::OnIdle, this);
 
-	FFQCFG()->SetBrowseRootFor(OpenFileDlg);
+	//FFQCFG()->SetBrowseRootFor(OpenFileDlg);
 
     FilterEditor = nullptr;
 
@@ -1799,12 +1799,24 @@ void FFQPresetEdit::PreviewFilters()
         if (item) m_PreviewFile = item->GetInput(0).path;
     }
 
-    if (m_ShowPreviewDlg)
+    if (m_ShowPreviewDlg || (!wxFileExists(m_PreviewFile)))
     {
-        OpenFileDlg->SetPath(m_PreviewFile);
+
+        //const wxString DLGID = "preset.preview";
+
+        if (!FFQCFG()->FileDlgExecute("preset.preview", OpenFileDlg, nullptr, false, &m_PreviewFile)) return;
+
+        /*FFQCFG()->FileDlgBefore(DLGID, OpenFileDlg, m_PreviewFile);
         if (OpenFileDlg->ShowModal() == wxID_CANCEL) return;
-        m_PreviewFile = OpenFileDlg->GetPath();
+        FFQCFG()->FileDlgAfter(DLGID, OpenFileDlg, nullptr, false);
+        m_PreviewFile = OpenFileDlg->GetPath();*/
+
+        /*OpenFileDlg->SetPath(m_PreviewFile);
+        if (OpenFileDlg->ShowModal() == wxID_CANCEL) return;
+        m_PreviewFile = OpenFileDlg->GetPath();*/
+
         m_ShowPreviewDlg = false;
+
     }
 
     cmd += " \"" + m_PreviewFile + "\" -autoexit";
@@ -1832,7 +1844,8 @@ void FFQPresetEdit::PreviewFilters()
     if (vf.Len() > 0) cmd += " -vf \"" + vf.BeforeLast('[') + "\"";
     if (af.Len() > 0) cmd += " -af \"" + af.BeforeLast('[') + "\"";
 
-    if (wxExecute(cmd) == 0) ShowError(FFQSF(SID_PRESET_PREVIEW_FAILED, cmd));
+    if (wxExecute(cmd, wxEXEC_ASYNC) == 0) ShowError(FFQSF(SID_PRESET_PREVIEW_FAILED, cmd));
+    //if (wxExecute(cmd, wxEXEC_ASYNC | wxEXEC_SHOW_CONSOLE) == 0) ShowError(FFQSF(SID_PRESET_PREVIEW_FAILED, cmd));
 
 }
 

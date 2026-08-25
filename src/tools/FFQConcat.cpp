@@ -526,16 +526,17 @@ FFQConcat::FFQConcat(wxWindow* parent)
 	FFQCFG()->SetCtrlColors(LimitDest);
 	FFQCFG()->SetCtrlColors(SSFrameStatus);
 
-	FFQCFG()->SetBrowseRootFor(OpenOneDlg);
-	FFQCFG()->SetBrowseRootFor(OpenMoreDlg);
-	FFQCFG()->SetBrowseRootFor(SaveFileDlg);
+	//FFQCFG()->SetBrowseRootFor(OpenOneDlg);
+	//FFQCFG()->SetBrowseRootFor(OpenMoreDlg);
+	//FFQCFG()->SetBrowseRootFor(SaveFileDlg);
 
-    m_EditJob = NULL;
+    m_EditJob = nullptr;
     m_DoIdleTask = false;
     m_BlurOK = FFQCFG()->AreFiltersAvailable("split,scale,boxblur,overlay");
 
-	m_TimeEdit = NULL;
-	m_PIP = NULL;
+	m_TimeEdit = nullptr;
+	m_PIP = nullptr;
+	m_ProgressDlg = nullptr;
 
 	m_TempPath = "";
 
@@ -565,16 +566,9 @@ FFQConcat::~FFQConcat()
 {
 	//(*Destroy(FFQConcat)
 	//*)
-	if (m_TimeEdit)
-    {
-        delete m_TimeEdit;
-        m_TimeEdit = NULL;
-    }
-    if (m_PIP)
-    {
-        delete m_PIP;
-        m_PIP = NULL;
-    }
+	DELETE_OBJ(m_TimeEdit);
+	DELETE_OBJ(m_ProgressDlg);
+	DELETE_OBJ(m_PIP);
     //CleanupLast();
 }
 
@@ -784,13 +778,51 @@ bool FFQConcat::Execute(LPFFQ_CONCAT_JOB job)
 
 //---------------------------------------------------------------------------------------
 
+void FFQConcat::ProgressAbort()
+{
+
+    //Abort the probing process
+    //FFQProcess *prc = m_PIP->GetProcess();
+    //if (prc) prc->Abort(false);
+    m_PIP->GetProcess()->Abort(false);
+
+}
+
+//---------------------------------------------------------------------------------------
+
+bool FFQConcat::ProgressStep(unsigned int step)
+{
+
+    //Probe a path
+    LPCONCAT_DATA cd = new CONCAT_DATA(m_Paths->Item(step));
+    if (!GetFileInfo(cd, false, false))
+    {
+        if (m_PIP->GetProcess()->WasAborted()) return false;
+        m_Errors->Add(cd->path);
+        //m_Errors += cd->path + CRLF;
+        delete cd;
+    }
+    else CCSources->Append(ConcatDataToString(cd, CCSimple->GetValue()), cd);
+    return true;
+
+}
+
+//---------------------------------------------------------------------------------------
+
 void FFQConcat::AddConcatSources(wxArrayString *paths)
 {
 
-    LPCONCAT_DATA cd;
-    wxString errors = "";
+    //LPCONCAT_DATA cd;
+    //wxString errors = "";
+    m_Paths = paths;
+    wxArrayString errs;
+    m_Errors = &errs;
 
-    for (unsigned int i = 0; i < paths->GetCount(); i++)
+    if (m_ProgressDlg == nullptr) m_ProgressDlg = new FFQProgressDlg(this, FFQS(SID_CONCAT_PROBING_SOURCES));
+
+    m_ProgressDlg->Execute(m_Paths->GetCount());
+
+    /*for (unsigned int i = 0; i < paths->GetCount(); i++)
     {
 
         cd = new CONCAT_DATA(paths->Item(i));
@@ -806,13 +838,26 @@ void FFQConcat::AddConcatSources(wxArrayString *paths)
         else CCSources->Append(ConcatDataToString(cd, CCSimple->GetValue()), cd);
 
     }
+    delete paths;*/
 
-    delete paths;
+    DELETE_OBJ(m_Paths);
 
     //Default output name
     if (CCSources->GetCount() > 0) SetDestFile( ((LPCONCAT_DATA)CCSources->GetClientData(0))->path );
 
-    if (errors.Len() > 0) ShowError(NULL, FFQS(SID_FFPROBE_FAILED_ON_FILES) + CRLF + CRLF + errors);
+    if (errs.GetCount() > 0)
+    {
+        FFQConsole *cs = FFQConsole::Get();
+        cs->AppendLine(FFQS(SID_FFPROBE_FAILED_ON_FILES), COLOR_RED);
+        for (unsigned int i = 0; i < errs.GetCount(); i++) cs->AppendLine("- " + errs[i], COLOR_RED);
+        ShowError(NULL, FFQSF(SID_CONCAT_PROBING_FAILED, (unsigned int)errs.GetCount()));
+    }
+    //if (errors.Len() > 0) ShowError(NULL, FFQS(SID_FFPROBE_FAILED_ON_FILES) + CRLF + CRLF + errors);
+    /*if (m_Errors.Len() > 0)
+    {
+        ShowError(NULL, FFQS(SID_FFPROBE_FAILED_ON_FILES) + CRLF + CRLF + m_Errors);
+        m_Errors.Clear();
+    }*/
 
     CCSources->SetFocus();
 
@@ -1040,12 +1085,12 @@ bool FFQConcat::EnumSlideshowFrames()
 
 //---------------------------------------------------------------------------------------
 
-bool FFQConcat::GetFileInfo(LPCONCAT_DATA cd, bool dimensionRequired)
+bool FFQConcat::GetFileInfo(LPCONCAT_DATA cd, bool dimensionRequired, bool block_ui)
 {
 
     if (!wxFileExists(cd->path)) return false;
     if (m_PIP == NULL) m_PIP = new FFProbeInfoParser();
-    if (m_PIP->RunFFProbe(cd->path))
+    if (m_PIP->RunFFProbe(cd->path, nullptr, false, block_ui))
     {
         if ((!m_PIP->GetVideoDimension(cd->width, cd->height)) && dimensionRequired) return false;
         if (!m_PIP->GetDuration(cd->duration)) return false;
@@ -1399,28 +1444,36 @@ void FFQConcat::OnAction(wxCommandEvent& event)
 
     if (evtId == ID_SSBROWSEIMG)
     {
-        OpenOneDlg->SetPath(SSSource->GetValue());
+
+        if (FFQCFG()->FileDlgExecute("concat.imgs", OpenOneDlg, SSSource)) EnumSlideshowFrames();
+
+        /*OpenOneDlg->SetPath(SSSource->GetValue());
         if (OpenOneDlg->ShowModal() != wxID_CANCEL)
         {
             SSSource->SetValue(OpenOneDlg->GetPath());
             EnumSlideshowFrames();
-        }
+        }*/
+
     }
 
     else if (evtId == ID_SSFRAMESTATUS) EnumSlideshowFrames();
 
     else if (evtId == ID_SSBROWSEAUDIO)
     {
-        OpenOneDlg->SetPath(SSAudio->GetValue());
-        if (OpenOneDlg->ShowModal() != wxID_CANCEL) SSAudio->SetValue(OpenOneDlg->GetPath());
+
+        FFQCFG()->FileDlgExecute("concat.audio", OpenOneDlg, SSAudio);
+        //OpenOneDlg->SetPath(SSAudio->GetValue());
+        //if (OpenOneDlg->ShowModal() != wxID_CANCEL) SSAudio->SetValue(OpenOneDlg->GetPath());
+
     }
 
     else if (evtId == ID_CCADD)
     {
 
+        if (FFQCFG()->FileDlgExecute("concat.vids", OpenMoreDlg, nullptr))
         //long style = OpenFileDlg->GetWindowStyleFlag();
         //OpenFileDlg->SetWindowStyleFlag(style | wxFD_MULTIPLE);
-        if (OpenMoreDlg->ShowModal() != wxID_CANCEL)
+        //if (OpenMoreDlg->ShowModal() != wxID_CANCEL)
         {
             wxArrayString *paths = new wxArrayString();
             OpenMoreDlg->GetPaths(*paths);
@@ -1458,8 +1511,9 @@ void FFQConcat::OnAction(wxCommandEvent& event)
     else if (evtId == ID_BROWSEDEST)
     {
 
-        SaveFileDlg->SetPath(DestFile->GetValue());
-        if (SaveFileDlg->ShowModal() != wxID_CANCEL) DestFile->SetValue(SaveFileDlg->GetPath());
+        FFQCFG()->FileDlgExecute("concat.out", SaveFileDlg, DestFile);
+        //SaveFileDlg->SetPath(DestFile->GetValue());
+        //if (SaveFileDlg->ShowModal() != wxID_CANCEL) DestFile->SetValue(SaveFileDlg->GetPath());
 
     }
 

@@ -143,7 +143,6 @@ FFQPresetMgr::FFQPresetMgr(wxWindow* parent,wxWindowID id)
 	BoxSizer2->Add(-1,-1,1, wxALL|wxEXPAND, 5);
 	FlexGridSizer1->Add(BoxSizer2, 1, wxALL|wxEXPAND, 5);
 	SetSizer(FlexGridSizer1);
-	FlexGridSizer1->Fit(this);
 	FlexGridSizer1->SetSizeHints(this);
 	Center();
 

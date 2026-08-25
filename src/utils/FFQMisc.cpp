@@ -40,6 +40,24 @@
 
 //---------------------------------------------------------------------------------------
 
+const char HEXCHARS_LEN = 16;
+const char HEXCHARS[HEXCHARS_LEN] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+
+//---------------------------------------------------------------------------------------
+
+SizerDisabler::SizerDisabler(wxSizer *sizer, const long *skip_ids, const unsigned int skip_count)
+{
+    m_Sizer = sizer;
+    EnableSizer(m_Sizer, false, skip_ids, skip_count);
+}
+
+SizerDisabler::~SizerDisabler()
+{
+    EnableSizer(m_Sizer, true);
+}
+
+//---------------------------------------------------------------------------------------
+
 size_t Base64DataLen(const wxString &base64)
 {
 
@@ -171,6 +189,59 @@ wxString StrToBase64(const wxString &str, size_t wrap_len)
     //Return result
     return res;
 
+}
+
+//---------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
+
+long BufToHex(uint8_t* buf, unsigned int buflen, char* dest, unsigned int destlen)
+{
+    if (destlen == 0) return buflen * 2;
+    unsigned int src = 0, dst = 0;
+    while ((src < buflen) && (dst < destlen - 1))
+    {
+        uint8_t b = buf[src++];
+        dest[dst++] = HEXCHARS[(b & 0xF0) >> 4];
+        dest[dst++] = HEXCHARS[b & 0xF];
+    }
+    return src;
+}
+
+//---------------------------------------------------------------------------------------
+
+wxString BufToHexStr(uint8_t* buf, unsigned int buflen)
+{
+    unsigned int destlen = buflen * 2;
+    char dest[destlen];
+    BufToHex(buf, buflen, dest, destlen);
+    return wxString(dest, destlen);
+}
+
+//---------------------------------------------------------------------------------------
+
+long HexToBuf(const wxString &hex, uint8_t* buf, unsigned int buflen)
+{
+
+    auto hexpos = [](char c) -> int8_t
+    {
+        for (int8_t i = 0; i < HEXCHARS_LEN; i++) if (HEXCHARS[i] == c) return i;
+        return -1;
+    };
+
+    long p = hex.Len() / 2;
+    if ((p == 0) || (buflen == 0)) return p;
+    if (buflen < (unsigned int)p) return -1;
+    const char* cc = hex.c_str().AsChar();
+    for (unsigned int i = 0; i < (unsigned int)p; i++)
+    {
+        int8_t h = hexpos(std::toupper(*(cc++)));
+        int8_t l = hexpos(std::toupper(*(cc++)));
+        if ((h < 0) || (l < 0)) return -2;
+        buf[i] = (h << 4) | l;
+    }
+    return p;
 }
 
 //---------------------------------------------------------------------------------------
@@ -518,6 +589,7 @@ bool StrSplit(wxString &value, wxString &key, wxUniChar separator, bool trim)
 
 
 //---------------------------------------------------------------------------------------
+
 wxString StrTrim(wxString str)
 {
 
@@ -548,6 +620,21 @@ wxString Unescape(wxString str)
     return res;
 
 }
+
+//---------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
+
+int IndexOfName(wxArrayString *as, wxString name)
+{
+
+    name += EQUAL;
+    for (unsigned int i = 0; i < as->Count(); i++) if (as->Item(i).StartsWith(name)) return (int)i;
+    return -1;
+
+}
+
 //---------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------
@@ -1039,16 +1126,13 @@ void EnsureUniquePath(wxString &path)
 //---------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------
 
-//Local variable to make sure that yield calls are not nested (which would cause a deadlock)
-bool m_Yielding = false;
-bool Yield_App(unsigned long sleep_millis)
+bool Yield_App(unsigned long sleep_millis, bool safe_yield)
 {
 
-    //Sleep a bit if tired
-    if (sleep_millis > 0) wxMilliSleep(sleep_millis);
+    //Local variable to make sure that yield calls are not nested (which would cause a deadlock)
+    static bool yielding = false;
 
-
-    if (m_Yielding)
+    if (yielding)
     {
 
         //If already yielding we return false - this should never happen!
@@ -1062,18 +1146,21 @@ bool Yield_App(unsigned long sleep_millis)
     }
 
     //Set yielding state
-    m_Yielding = true;
+    yielding = true;
+
+    //Sleep a bit if tired
+    if (sleep_millis > 0) wxMilliSleep(sleep_millis);
 
     try
     {
         //Yield execution
-        wxSafeYield();
-        //wxGetApp().Yield();
+        if (safe_yield) wxSafeYield();
+        else wxYield();
 
     } catch (...) {}
 
     //Set yielding state
-    m_Yielding = false;
+    yielding = false;
 
     //Return success
     return true;

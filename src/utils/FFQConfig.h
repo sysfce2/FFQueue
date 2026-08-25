@@ -90,6 +90,7 @@ class FFQConfig
 	    bool confirm_delete_jobs;
 	    bool preview_map_subs;
 	    bool dont_save_ffmpeg;
+	    bool save_paths;
 
 	    bool is_flat;
 	    bool is_snap;
@@ -111,6 +112,7 @@ class FFQConfig
 	    wxString saved_commands;
 	    wxString user_locale;
 	    wxString share_data_dir;
+	    wxString translate_cmd;
 
 	    int num_encode_slots;
 
@@ -121,6 +123,9 @@ class FFQConfig
 		bool            AreFiltersAvailable(wxString filter_list);
 		void            CheckFontsConf();
         void            DefaultOptions();
+		void            FileDlgAfter(wxString ident, wxFileDialog *dlg, wxTextEntry *te, bool change_value = false, wxString *path = nullptr);
+		void            FileDlgBefore(wxString ident, wxFileDialog *dlg, wxString path);
+		bool            FileDlgExecute(wxString ident, wxFileDialog *dlg, wxTextEntry *te, bool change_value = false, wxString *path = nullptr);
         wxString        FindSecondaryInputFile(wxString &for_filename);
         unsigned int    FindSecondaryInputFiles(wxString &for_filename, wxArrayString &dest, unsigned int limit = 0);
         LPCODEC_INFO    GetCodecInfo();
@@ -129,7 +134,7 @@ class FFQConfig
 		wxString        GetConsoleCommand(wxString prog, wxString args);
         wxString        GetExecutableName(EXECUTABLE_TYPE exe_type, bool add_ext = true);
 		wxString        GetFFMpegCommand(bool ffprobe = false, wxString ffmpeg_path = "");
-		wxString        GetFFPlayCommand(bool show_error_if_not_found, PLAYER_TYPE *ptype = NULL);
+		wxString        GetFFPlayCommand(bool show_error_if_not_found, PLAYER_TYPE *ptype = nullptr);
 		wxString        GetFFMpegCodecs(CODEC_TYPE ct);
 		wxString        GetFFMpegFilters();
 		wxString        GetFFMpegFormats();
@@ -147,7 +152,7 @@ class FFQConfig
 	    void            LoadConfig();
 	    bool            SaveArrayString(wxString filename, wxArrayString* array_string);
 	    void            SaveConfig();
-        void            SetBrowseRootFor(wxFileDialog *dlg);
+        //void            SetBrowseRootFor(wxFileDialog *dlg);
         void            SetCodecInfo(LPCODEC_INFO root, bool save_config = true);
 	    void            SetCtrlColors(wxGenericHyperlinkCtrl *ctrl);
 	    bool            SetSaveLog(bool log, bool save_config = true);
@@ -164,6 +169,7 @@ class FFQConfig
 	    LPPIXEL_FORMAT m_PixelFormats; //List of supported pixel formats
 	    wxWindow* m_PresetManager; //Instance of preset manager
 	    FFQTaskBar* m_TaskBar; //Pointer to task bar object (windows only)
+	    wxArrayString m_Paths; //Stored paths used in file dialogs
 
 	    wxString m_AudioCodecs; //List of supported audio codecs
 	    wxString m_ConfigFile; //Full path and name of configuration file

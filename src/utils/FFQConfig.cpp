@@ -23,6 +23,7 @@
 
 #include "FFQConfig.h"
 #include "FFQProcess.h"
+#include "FFQParsing.h"
 #include "../FFQMain.h"
 #include "../FFQPresetMgr.h"
 #include "../bin_res.h"
@@ -44,11 +45,12 @@ FFQConfig* FFQConfig::m_Instance = NULL;
 //extern declarations
 //const wxString FILENAME_CONFIG = "ffqueue.cfg";
 
-const wxString CFG_PRESET = "[preset]";
 const wxString CFG_CODEC_INFO = "[codec_info]";
+const wxString CFG_PATHS      = "[paths]";
+const wxString CFG_PRESET     = "[preset]";
 
-const wxString TEMP_PATH_SYST = "<sys>";
 const wxString TEMP_PATH_DEST = "<dest>";
+const wxString TEMP_PATH_SYST = "<sys>";
 
 const wxString PATTERN_VAR_FILENAME = "<file_name>";
 const wxString PATTERN_VAR_FILEFMT = "<file_format>";
@@ -92,10 +94,16 @@ const wxString CFG_LOCALE = "locale";
 const wxString CFG_COLORS = "colors";
 const wxString CFG_NUM_ENC_SLOTS = "num_encode_slots";
 const wxString CFG_DONT_SAVE_FFMPEG = "dont_save_ffmpeg";
-
-//Private helper functions
+const wxString CFG_TRANSLATE_CMD = "translate_cmd";
 
 //---------------------------------------------------------------------------------------
+
+//Version used for storing FFmpeg capabilities
+const long FFCAPS_VERSION = 1;
+const wxString FFCAPS_VERSION_PREFIX = "capsver";
+
+//---------------------------------------------------------------------------------------
+//Private helper functions
 
 wxString find_file_using_PATH(wxString file_name)
 {
@@ -128,6 +136,39 @@ bool IsFilterDescription(wxString &s)
 
 //---------------------------------------------------------------------------------------
 
+bool SkipDescriptiveLines(FFQLineParser &from, int *descr_len = nullptr)
+{
+
+    //This will skip all lines until a line consisting of only "-" if found
+    //and all the skipped lines will be examined for the position of "="
+    //which indicates the length of the descriptive characters
+
+    int dlen = 0, p;
+
+    while (from.has_more())
+    {
+
+        wxString s = from.next();
+
+        if ((size_t)s.Freq('-') == (s.Len() - 1)) //First character is always a space, so ignore it
+        {
+            if (descr_len) *descr_len = dlen - 1;
+            return (dlen > 0);
+        }
+
+        //Find the position of '=' which is where the important stuff starts
+        p = s.Find(EQUAL);
+        if (p > dlen) dlen = p;
+
+    }
+
+    return false;
+
+}
+//---------------------------------------------------------------------------------------
+
+/*
+
 CODEC_TYPE ParseCodec(wxString &c, bool encoders)
 {
 
@@ -153,6 +194,75 @@ CODEC_TYPE ParseCodec(wxString &c, bool encoders)
     //Index of A,V,S character
     int idx = encoders ? 0 : 2;
 
+    if (s1.GetChar(idx) == 'V') res = ctVIDEO;
+    else if (s1.GetChar(idx) == 'A') res = ctAUDIO;
+    else if (s1.GetChar(idx) == 'S') res = ctSUBTITLE;
+    else return ctINVALID;
+
+    if (encoders)
+    {
+
+        //Retrieved with -encoders option
+        if (s1.GetChar(3) == 'X') c += " (EXPERIMENTAL)";
+        if (c.Find(s2 + " ") == 0) c.Remove(0, s2.Len() + 1);
+        c = s2 + " - " + c + "\n";
+
+    }
+
+    else
+    {
+
+        //Retrieved with -codecs option
+
+        if (s1.GetChar(1) != 'E') return ctINVALID; //Not an encoder
+
+        //Extract encoders - if available
+        wxString s3 = GetToken(c, " (encoders:", true);
+
+        //Remove "(decoders:" if present
+        s3 = GetToken(s3, " (decoders:", true) + "\n";
+
+        if (c.Len() > 0)
+        {
+
+            //c contains encoders separated by space
+            c.RemoveLast(); //Remove trailing ")"
+            c = StrTrim(c); //Trim blanks
+
+            //Make list of encoders
+            s1.Clear();
+            while (c.Len() > 0) s1 += GetToken(c, " ", true) + " - " + s3;
+
+            //Set result
+            c = s1;
+
+        }
+
+        //No encoder list - use s2
+        else c = s2 + " - " + s3;
+
+    }
+
+    return res;
+
+}
+
+*/
+
+CODEC_TYPE ParseCodec(wxString &c, bool encoders, size_t descr_len)
+{
+
+    //Descriptive characters: encoders=[V|A|S]FSXBD ,codecs=DE[V|A|S]SDT
+
+    wxString s1 = c.SubString(c.GetChar(0) == SPACE ? 1 : 0, descr_len - 1), s2;
+    c.Remove(0, descr_len + 1);
+    s2 = GetToken(c, ' '); //Codec name for command line
+    c = StrTrim(c); //c is now codec description
+
+    //Index of A,V,S character
+    int idx = encoders ? 0 : 2;
+
+    CODEC_TYPE res;
     if (s1.GetChar(idx) == 'V') res = ctVIDEO;
     else if (s1.GetChar(idx) == 'A') res = ctAUDIO;
     else if (s1.GetChar(idx) == 'S') res = ctSUBTITLE;
@@ -356,32 +466,10 @@ FFQConfig::~FFQConfig()
 
     //Destructor - release allocated stuff
 
-    delete m_TaskBar;
-    m_TaskBar = NULL;
-
-    if (m_PresetManager)
-    {
-
-        delete m_PresetManager;
-        m_PresetManager = NULL;
-
-    }
-
-    if (m_CodecInfo)
-    {
-
-        delete m_CodecInfo;
-        m_CodecInfo = NULL;
-
-    }
-
-    if (m_PixelFormats)
-    {
-
-        delete m_PixelFormats;
-        m_PixelFormats = NULL;
-
-    }
+    DELETE_OBJ(m_TaskBar);
+    DELETE_OBJ(m_PresetManager);
+    DELETE_OBJ(m_CodecInfo);
+    DELETE_OBJ(m_PixelFormats);
 
 }
 
@@ -514,9 +602,11 @@ void FFQConfig::DefaultOptions()
     confirm_delete_jobs = true;
     preview_map_subs = false;
     dont_save_ffmpeg = false;
+    save_paths = false;
     saved_commands = wxEmptyString;
     subs_charenc = wxEmptyString;
     user_locale = wxEmptyString;
+    translate_cmd = wxEmptyString;
 
     num_encode_slots = 1;
 
@@ -543,9 +633,107 @@ void FFQConfig::DefaultOptions()
     m_HWAccels = wxEmptyString;
     m_HWDecoders = wxEmptyString;
     m_CapsFile = wxEmptyString;
+    m_Paths.Clear();
 
 }
 
+//---------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
+
+void FFQConfig::FileDlgAfter(wxString ident, wxFileDialog *dlg, wxTextEntry *te, bool change_value, wxString *path)
+{
+
+    //Store the dialog's path after execute
+    wxString p = dlg->GetPath();
+    if (p.Len() == 0)
+    {
+        wxArrayString as;
+        dlg->GetPaths(as);
+        if (as.Count() > 0) p = as[0];
+    }
+
+    if (path) *path = p;
+
+    if (te)
+    {
+
+        if (change_value) te->ChangeValue(p);
+        else te->SetValue(p);
+        wxWindow *w = dynamic_cast<wxWindow*>(te);
+        if (w && w->AcceptsFocus()) w->SetFocus();
+
+    }
+
+    if (ident.Len() > 0)
+    {
+
+        //GetDirectory may return empty string if "recent files" was displayed
+        wxString d = dlg->GetDirectory();
+        if (d.Len() == 0) d = p.BeforeLast(wxFileName::GetPathSeparator());
+
+        int i = IndexOfName(&m_Paths, ident);
+        if (i < 0) m_Paths.Add(ident + EQUAL + d);
+        else m_Paths[i] = ident + EQUAL + d;
+        if (save_paths) SaveConfig();
+
+    }
+
+}
+
+//---------------------------------------------------------------------------------------
+
+void FFQConfig::FileDlgBefore(wxString ident, wxFileDialog *dlg, wxString filename)
+{
+
+    //Load path prior to execute
+    int i = (ident.Len() > 0) ? IndexOfName(&m_Paths, ident) : -1;
+    if (i > -1) dlg->SetDirectory(m_Paths[i].AfterFirst(EQUAL));
+    //Make sure that file dialogs in a snap start in a valid location
+    else if (is_snap) dlg->SetDirectory(wxStandardPaths::Get().GetDocumentsDir());
+    if (filename.Find(wxFileName::GetPathSeparator()) >= 0) dlg->SetPath(filename);
+    else dlg->SetFilename(filename);
+
+}
+
+//---------------------------------------------------------------------------------------
+
+bool FFQConfig::FileDlgExecute(wxString ident, wxFileDialog *dlg, wxTextEntry *te, bool change_value, wxString *path)
+{
+
+    // Performs before + execute + after
+    /*
+       Stored paths are:
+       cfg.ffmpeg
+       cfg.player
+       job.in
+       job.out
+       main.batch
+       preset.preview
+       filter
+       concat.imgs
+       concat.audio
+       concat.vids
+       concat.out
+       thumbs
+       vidstab.in
+       vidstab.out
+       vid2gif.in
+       vid2gif.out
+       langedit
+    */
+    wxString fn = wxEmptyString;
+    if (te) fn = te->GetValue();
+    else if (path) fn = *path;
+    FileDlgBefore(ident, dlg, fn);
+    if (dlg->ShowModal() == wxID_CANCEL) return false;
+    FileDlgAfter(ident, dlg, te, change_value, path);
+    return true;
+
+}
+
+//---------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------
 
 wxString FFQConfig::FindSecondaryInputFile(wxString &for_filename)
@@ -1143,6 +1331,19 @@ void FFQConfig::LoadConfig()
 
                 }
 
+                else if (line.Lower() == CFG_PATHS)
+                {
+
+                    save_paths = true;
+                    while(!cfg.Eof())
+                    {
+                        line = StrTrim(cfg.GetNextLine());
+                        if (line.Len() == 0) break;
+                        m_Paths.Add(line);
+                    }
+
+                }
+
                 else if (line.Lower() == CFG_CODEC_INFO)
                 {
 
@@ -1205,6 +1406,7 @@ void FFQConfig::LoadConfig()
                     else if (name == CFG_DONT_SAVE_FFMPEG) dont_save_ffmpeg = STRBOOL(line);
                     else if (name == CFG_SUBS_CHARENC) subs_charenc = line;
                     else if (name == CFG_LOCALE) user_locale = line;
+                    else if (name == CFG_TRANSLATE_CMD) translate_cmd = line;
                     else if (name == CFG_NUM_ENC_SLOTS) num_encode_slots = (int)Str2Long(line, (long)num_encode_slots);
 
 
@@ -1298,6 +1500,12 @@ bool FFQConfig::SaveArrayString(wxString filename, wxArrayString* array_str)
 
 //---------------------------------------------------------------------------------------
 
+void SaveCfgStr(wxTextFile &to_file, const wxString &name, wxString &value)
+{
+    //Prevent empty strings from being stored
+    if (value.Len() > 0) to_file.AddLine(name + EQUAL + value);
+}
+
 void FFQConfig::SaveConfig()
 {
 
@@ -1327,16 +1535,16 @@ void FFQConfig::SaveConfig()
 
         //Write config to file
         cfg.AddLine(CFG_HEADER_10);
-        cfg.AddLine(CFG_FFMPEG_PATH + "=" + m_FFPath);
-        cfg.AddLine(CFG_TEMP_PATH + "=" + temp_path);
-        cfg.AddLine(CFG_THUMB_SETTINGS + "=" + thumb_settings);
-        cfg.AddLine(CFG_SECOND_FILE_EXTS + "=" + second_file_extensions);
-        cfg.AddLine(CFG_BATCH_CFG + "=" + batch_config);
-        cfg.AddLine(CFG_CUSTOM_PLAYER + "=" + cust_player);
-        cfg.AddLine(CFG_PREFERRED_FMT + "=" + preferred_format);
-        cfg.AddLine(CFG_PREFERRED_PATH + "=" + preferred_path);
+        SaveCfgStr(cfg, CFG_FFMPEG_PATH, m_FFPath); //cfg.AddLine(CFG_FFMPEG_PATH + "=" + m_FFPath);
+        SaveCfgStr(cfg, CFG_TEMP_PATH, temp_path); //cfg.AddLine(CFG_TEMP_PATH + "=" + temp_path);
+        SaveCfgStr(cfg, CFG_THUMB_SETTINGS, thumb_settings); //cfg.AddLine(CFG_THUMB_SETTINGS + "=" + thumb_settings);
+        SaveCfgStr(cfg, CFG_SECOND_FILE_EXTS, second_file_extensions); //cfg.AddLine(CFG_SECOND_FILE_EXTS + "=" + second_file_extensions);
+        SaveCfgStr(cfg, CFG_BATCH_CFG, batch_config); //cfg.AddLine(CFG_BATCH_CFG + "=" + batch_config);
+        SaveCfgStr(cfg, CFG_CUSTOM_PLAYER, cust_player); //cfg.AddLine(CFG_CUSTOM_PLAYER + "=" + cust_player);
+        SaveCfgStr(cfg, CFG_PREFERRED_FMT, preferred_format); //cfg.AddLine(CFG_PREFERRED_FMT + "=" + preferred_format);
+        SaveCfgStr(cfg, CFG_PREFERRED_PATH, preferred_path); //cfg.AddLine(CFG_PREFERRED_PATH + "=" + preferred_path);
         cfg.AddLine(CFG_PREFERRED_UNIQUE + "=" + BOOLSTR(preferred_unique));
-        cfg.AddLine(CFG_OUTPUT_NAME_PATTERN + "=" + output_name_pattern);
+        SaveCfgStr(cfg, CFG_OUTPUT_NAME_PATTERN, output_name_pattern); //cfg.AddLine(CFG_OUTPUT_NAME_PATTERN + "=" + output_name_pattern);
         cfg.AddLine(CFG_KEEP_CONSOLE + "=" + BOOLSTR(keep_console));
         cfg.AddLine(CFG_AUTO_REMOVE + "=" + BOOLSTR(auto_remove_jobs));
         cfg.AddLine(CFG_FONTSCONF_CHECKED + "=" + BOOLSTR(fonts_conf_checked));
@@ -1345,20 +1553,21 @@ void FFQConfig::SaveConfig()
         cfg.AddLine(CFG_HIDE_BANNER + "=" + BOOLSTR(hide_banner));
         if (save_window_pos) cfg.AddLine(CFG_SAVE_WINDOW_POS + "=" + STR_YES + "|" + window_position);
         else cfg.AddLine(CFG_SAVE_WINDOW_POS + "=" + STR_NO);
-        cfg.AddLine(CFG_LIST_COLUMNS + "=" + list_columns);
-        cfg.AddLine(CFG_VIDSTAB_SETTINGS + "=" + vidstab_settings);
+        SaveCfgStr(cfg, CFG_LIST_COLUMNS, list_columns); //cfg.AddLine(CFG_LIST_COLUMNS + "=" + list_columns);
+        SaveCfgStr(cfg, CFG_VIDSTAB_SETTINGS, vidstab_settings); //cfg.AddLine(CFG_VIDSTAB_SETTINGS + "=" + vidstab_settings);
         cfg.AddLine(CFG_FULL_CODEC_LIST + "=" + BOOLSTR(full_codec_listings));
-        cfg.AddLine(CFG_CONSOLE_CMD + "=" + console_cmd);
+        SaveCfgStr(cfg, CFG_CONSOLE_CMD, console_cmd); //cfg.AddLine(CFG_CONSOLE_CMD + "=" + console_cmd);
         cfg.AddLine(CFG_SAVE_LOG + "=" + BOOLSTR(save_log));
         cfg.AddLine(CFG_SILENT_QFINISH + "=" + BOOLSTR(silent_qfinish));
-        cfg.AddLine(CFG_SAVED_COMMANDS + "=" + saved_commands);
+        SaveCfgStr(cfg, CFG_SAVED_COMMANDS, saved_commands); //cfg.AddLine(CFG_SAVED_COMMANDS + "=" + saved_commands);
         cfg.AddLine(CFG_SAVE_ON_MODIFY + "=" + BOOLSTR(save_on_modify));
         cfg.AddLine(CFG_VALIDATE_ON_LOAD + "=" + BOOLSTR(validate_on_load));
         cfg.AddLine(CFG_CONFIRM_DELETE_JOBS + "=" + BOOLSTR(confirm_delete_jobs));
         cfg.AddLine(CFG_PREVIEW_MAP_SUBS + "=" + BOOLSTR(preview_map_subs));
         cfg.AddLine(CFG_DONT_SAVE_FFMPEG + "=" + BOOLSTR(dont_save_ffmpeg));
-        cfg.AddLine(CFG_SUBS_CHARENC + "=" + subs_charenc);
-        cfg.AddLine(CFG_LOCALE + "=" + user_locale);
+        SaveCfgStr(cfg, CFG_SUBS_CHARENC, subs_charenc); //cfg.AddLine(CFG_SUBS_CHARENC + "=" + subs_charenc);
+        SaveCfgStr(cfg, CFG_LOCALE, user_locale); //cfg.AddLine(CFG_LOCALE + "=" + user_locale);
+        SaveCfgStr(cfg, CFG_TRANSLATE_CMD, translate_cmd); //cfg.AddLine(CFG_TRANSLATE_CMD + "=" + translate_cmd);
         cfg.AddLine(CFG_NUM_ENC_SLOTS + "=" + ToStr(num_encode_slots));
 
         //Empty line to separate codec_info's
@@ -1380,6 +1589,15 @@ void FFQConfig::SaveConfig()
 
             cfg.AddLine(CFG_CODEC_INFO);
             cfg.AddLine(s); //Since "s" ends with "\n" there will be a blank line to end section
+
+        }
+
+        if (save_paths)
+        {
+
+            cfg.AddLine(CFG_PATHS);
+            for (unsigned int i = 0; i < m_Paths.Count(); i++) cfg.AddLine(m_Paths[i]);
+            cfg.AddLine(wxEmptyString);
 
         }
 
@@ -1442,13 +1660,13 @@ void FFQConfig::SetCodecInfo(LPCODEC_INFO root, bool save_config)
 
 //---------------------------------------------------------------------------------------
 
-void FFQConfig::SetBrowseRootFor(wxFileDialog *dlg)
+/*void FFQConfig::SetBrowseRootFor(wxFileDialog *dlg)
 {
 
     //Make sure that file dialogs in a snap start in a valid location
     if (is_snap) dlg->SetDirectory(wxStandardPaths::Get().GetDocumentsDir());
 
-}
+}*/
 
 //---------------------------------------------------------------------------------------
 
@@ -1554,15 +1772,15 @@ bool FFQConfig::ValidateFFMpegPath(wxString path, bool set_config_path_if_valid)
 
     //Create file extension for capabilities
     const wxString VERSION_CHARS = "0123456789.-";
-    size_t vl = 0;
+    int cc = 0;
     s = GetToken(short_ver, SPACE, false);
-    while ((vl < s.Len()) && (VERSION_CHARS.Find(s.GetChar(vl)) >= 0)) vl++;
-    if (vl == 0)
+    while ((cc < (int)s.Len()) && (VERSION_CHARS.Find(s.GetChar(cc)) >= 0)) cc++;
+    if (cc == 0)
     {
         if (s.StartsWith("N-")) s = s.Right(s.Len() - 2);
-        vl = s.Len();
+        cc = s.Len();
     }
-    m_CapsFile = m_ConfigPath + wxFileName::GetPathSeparator() + "ffmpeg-caps." + s.SubString(0, vl - 1);
+    m_CapsFile = m_ConfigPath + wxFileName::GetPathSeparator() + "ffmpeg-caps." + s.SubString(0, cc - 1);
 
     //Variables used to store ffmpeg capabilities
     wxString a_codecs = "", v_codecs = "", s_codecs = "", filters = "", hwacl = "", hwdec = "", muxers = "", pixfmtstr = "";
@@ -1581,6 +1799,34 @@ bool FFQConfig::ValidateFFMpegPath(wxString path, bool set_config_path_if_valid)
 
     //Extract supported codecs for encoding
     s = proc->GetFFMpegEncoders(path);
+    FFQLineParser lp(s);
+    bool ok = SkipDescriptiveLines(lp, &cc), encoders = ok;
+    if (!ok)
+    {
+        s = proc->GetFFMpegCodecs(path);
+        lp.reset();
+        ok = SkipDescriptiveLines(lp, &cc);
+    }
+
+    CODEC_TYPE ct;
+    while (ok && lp.has_more())
+    {
+
+        //t = StrTrim(GetLine(s));
+        t = lp.next();
+
+        if (t.Len() == 0) ok = false; //Stop at any empty line
+        else
+        {
+            ct = ParseCodec(t, encoders, cc);
+            if (ct == ctVIDEO) v_codecs += t;
+            else if (ct == ctAUDIO) a_codecs += t;
+            else if (ct == ctSUBTITLE) s_codecs += t;
+        }
+
+    }
+
+    /*
 
     //Skip all lines before "------"
     while ( (s.Len() > 0) && (StrTrim(GetLine(s)).Find("-----") != 0) ) ;
@@ -1615,6 +1861,7 @@ bool FFQConfig::ValidateFFMpegPath(wxString path, bool set_config_path_if_valid)
         }
 
     }
+    */
 
     //Hardware accelerators (for decoding)
     s = proc->GetFFMpegOther("-hwaccels", path);
@@ -1630,7 +1877,6 @@ bool FFQConfig::ValidateFFMpegPath(wxString path, bool set_config_path_if_valid)
 
     //Create a list of supported filters
     s = proc->GetFFMpegFilters(path);
-
     while (s.Len() > 0)
     {
 
@@ -1657,8 +1903,34 @@ bool FFQConfig::ValidateFFMpegPath(wxString path, bool set_config_path_if_valid)
     }
 
     //Create a list of supported formats
+    //wxFile tf("junk/snap2/formats_6.1.txt");
+    //ok = tf.ReadAll(&s);
+    //tf.Close();
+    //if (!ok) s.Clear();
     s = proc->GetFFMpegFormats(path);
+    lp.reset();
+    if (SkipDescriptiveLines(lp, &cc))
+    {
+        while (lp.has_more())
+        {
+            t = lp.next();
+            st = t.SubString(0, cc);
 
+            //Test if muxer and not device
+            if ((st.Find('E') >= 0) && (st.Find('d') < 0))
+            {
+
+                //Yup! Add to formats
+                t.Remove(0, cc + 1);
+                st = StrTrim(GetToken(t, " "));
+                if (st.Find(',') > 0) st = st.BeforeFirst(','); //Remove alternate format names (eg. stream_segment,ssegment)
+                muxers += st + " - " + StrTrim(t) + "\n";
+
+            }
+        }
+    }
+
+    /*
     //Skip lines before "--"
     while ((s.Len() > 0) && (!StrTrim(GetLine(s, true)).StartsWith('-'))) ;
 
@@ -1668,12 +1940,15 @@ bool FFQConfig::ValidateFFMpegPath(wxString path, bool set_config_path_if_valid)
 
         //Get a line
         t = StrTrim(GetLine(s, true));
+        if (t.Len() < 3) continue; //Skippedeedoo
 
-        //Get muxer / demuxer field
-        st = StrTrim(GetToken(t, " ", true));
+        //Get muxer / demuxer / device field
+        //st = StrTrim(GetToken(t, " ", true));
+        st = t.SubString(0, 3);
+        t.Remove(0, 3).Trim(false);
 
-        //Test if muxer
-        if (st.Find('E') >= 0)
+        //Test if muxer and not device
+        if ((st.Find('E') >= 0) && (st.Find('d') < 0))
         {
 
             //Yup! Add to formats
@@ -1683,7 +1958,7 @@ bool FFQConfig::ValidateFFMpegPath(wxString path, bool set_config_path_if_valid)
 
         }
 
-    }
+    }*/
 
     //Remove last ","
     if (muxers.Len() > 0) muxers.RemoveLast();
@@ -1849,7 +2124,8 @@ bool FFQConfig::LoadFFmpegCapabilities()
         wxTextFile tf(m_CapsFile);
         if (tf.IsOpened() || tf.Open())
         {
-            wxString *cur = NULL, l, pixfmt = wxEmptyString;
+            wxString *cur = nullptr, l, pixfmt = wxEmptyString;
+            long capsver = 0;
             bool first = true;
             while (!tf.Eof())
             {
@@ -1865,7 +2141,15 @@ bool FFQConfig::LoadFFmpegCapabilities()
                     else if (l == "::HWDC") cur = &m_HWDecoders;
                     else if (l == "::FMTS") cur = &m_Formats;
                     else if (l == "::PXFT") cur = &pixfmt;
-                    else if (cur != NULL) *cur += l + CRLF;
+                    else if (cur != nullptr)
+                    {
+
+                        //If version not matches, return false to force recreation of caps
+                        if (capsver != FFCAPS_VERSION) return false;
+                        *cur += l + CRLF;
+
+                    }
+                    else if (l.StartsWith(FFCAPS_VERSION_PREFIX + EQUAL)) capsver = Str2Long(l.AfterFirst(EQUAL), -1);
                 }
             }
             tf.Close();
@@ -1893,6 +2177,7 @@ void FFQConfig::SaveFFmpegCapabilities()
         wxFile tf(m_CapsFile, wxFile::write);
         if (tf.IsOpened())
         {
+            tf.Write(FFCAPS_VERSION_PREFIX + EQUAL + ToStr(FFCAPS_VERSION) + CRLF);
             tf.Write("::AENC\n"); tf.Write(m_AudioCodecs); tf.Write(CRLF);
             tf.Write("::VENC\n"); tf.Write(m_VideoCodecs); tf.Write(CRLF);
             tf.Write("::SENC\n"); tf.Write(m_SubtitleCodecs); tf.Write(CRLF);

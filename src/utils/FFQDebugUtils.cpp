@@ -640,20 +640,31 @@ wxString CreateMakefiles(wxString cbp_path)
     autoconf_ac += "AS_IF([test ${WXVER::3} -lt 302], [ AC_MSG_ERROR([wxWidgets must be at least version 3.0.2]) ], [])" + LBR;
     autoconf_ac += "AC_CONFIG_FILES([Makefile src/Makefile])" + LBR;
     autoconf_ac += "AC_CHECK_LIB([z], [compress2], [], [AC_MSG_ERROR([ZLib (libz) was not found!])])" + LBR;
+    autoconf_ac += "AC_CHECK_HEADER([zlib.h], [], [AC_MSG_ERROR([ZLib headers (libz-dev) was not found!])])" + LBR;
     autoconf_ac += "AM_CONDITIONAL([FFQ_BASE_DIR],[test -f \"res/MainLogo.png\"])" + LBR;
+    autoconf_ac += "AC_ARG_ENABLE([xdg-install], [AS_HELP_STRING([--enable-xdg-install],[Enable or disable the use of xdg-utils to install icons and desktop files, default is enabled.])], [], [])" + LBR;
+    autoconf_ac += "AM_CONDITIONAL([FFQ_NO_XDG], [test x\"$enable_xdg_install\" = x\"no\"])" + LBR;
+
     //autoconf_ac += "AM_CONDITIONAL([FFQ_AS_ROOT],[test `whoami` = root])" + LBR;
     //autoconf_ac += "AM_CONDITIONAL([FFQ_SNAP],[test -n \"$(SNAPCRAFT_PROJECT_NAME)\"])" + LBR;
     autoconf_ac += "LIBS=\"$LIBS `wx-config --libs` -lz\"" + LBR;
     autoconf_ac += "AC_OUTPUT" + LBR;
 
+    bool metinf = wxFileExists("res/metainfo.xml");
+
     makefile_am += "SUBDIRS=src" + LBR;
     makefile_am += "FFQ_BINARY=ffqueue" + LBR;
-    makefile_am += "FFQ_XDGVER=`xdg-icon-resource --version 2> /dev/null`" + LBR;
     makefile_am += "if FFQ_BASE_DIR" + LBR;
     makefile_am += "FFQ_RES=res" + LBR;
     makefile_am += "else" + LBR;
     makefile_am += "FFQ_RES=../res" + LBR;
     makefile_am += "endif" + LBR;
+    makefile_am += "if FFQ_NO_XDG" + LBR;
+    makefile_am += "FFQ_XDGVER=\"\"" + LBR;
+    makefile_am += "else" + LBR;
+    makefile_am += "FFQ_XDGVER=`xdg-icon-resource --version 2> /dev/null`" + LBR;
+    makefile_am += "endif" + LBR;
+
 
     //makefile_am += "if DESTDIR" + LBR + "FFQ_DEST:=$(DESTDIR)/share" + LBR + "else" + LBR + "FFQ_DEST:=$(prefix)/share" + LBR + "endif" + LBR;
     makefile_am += "FFQ_DEST=$(DESTDIR)$(prefix)/share" + LBR;
@@ -675,6 +686,7 @@ wxString CreateMakefiles(wxString cbp_path)
     makefile_am += "\t   @FFQ_DF=$(FFQ_DEST)/applications/$(FFQ_BINARY).desktop" + LBR;
     makefile_am += "\t   @if [ -f \"$$FFQ_DF\" ]; then chmod 755 \"$$FFQ_DF\"; fi" + LBR;
     makefile_am += "\t @fi" + LBR;
+    if (metinf) makefile_am += "\t @install -Dm644 $(FFQ_RES)/metainfo.xml $(FFQ_DEST)/metainfo/$(FFQ_BINARY).xml" + LBR;
 
     makefile_am += LBR + ".ONESHELL:" + LBR;
     makefile_am += "uninstall-hook:" + LBR;
@@ -687,6 +699,7 @@ wxString CreateMakefiles(wxString cbp_path)
     ADD_ICONS(makefile_am);
     makefile_am += "\t   @xdg-desktop-menu uninstall --novendor $(FFQ_BINARY).desktop" + LBR;
     makefile_am += "\t @fi" + LBR;
+    if (metinf) makefile_am += "\t @rm -f $(FFQ_DEST)/metainfo/$(FFQ_BINARY).xml" + LBR;
 
     src_makefile_am += "bin_PROGRAMS=ffqueue" + LBR;
     src_makefile_am += "ffqueue_CXXFLAGS=`wx-config --debug=no --cxxflags` -std=c++11 -include ../wx_pch.h" + LBR;

@@ -191,6 +191,7 @@ FFQConfigEdit::FFQConfigEdit(wxWindow* parent,wxWindowID id)
 	CheckList->Append(FFQS(SID_OPTIONS_CONFIRM_DELETE_JOBS));
 	CheckList->Append(FFQS(SID_OPTIONS_PREVIEW_MAP_SUBS));
 	CheckList->Append(FFQS(SID_OPTIONS_DONT_SAVE_FFMPEG));
+	CheckList->Append(FFQS(SID_OPTIONS_SAVE_PATHS));
 	FlexGridSizer1->Add(CheckList, 1, wxALL|wxEXPAND, 3);
 	BoxSizer2 = new wxBoxSizer(wxHORIZONTAL);
 	LangButton = new wxButton(this, ID_LANGBUTTON, _("Lng"), wxDefaultPosition, wxDefaultSize, 0, wxDefaultValidator, _T("ID_LANGBUTTON"));
@@ -226,7 +227,7 @@ FFQConfigEdit::FFQConfigEdit(wxWindow* parent,wxWindowID id)
 
 	SetTitle(FFQS(SID_OPTIONS_TITLE));
 
-	FFQCFG()->SetBrowseRootFor(OpenDialog);
+	//FFQCFG()->SetBrowseRootFor(OpenDialog);
 
 	wxSize sz = BrowseTemp->GetSize();
 	sz.SetWidth(-1);
@@ -282,6 +283,7 @@ bool FFQConfigEdit::Execute()
     CheckList->Check(11, FFQCFG()->confirm_delete_jobs);
     CheckList->Check(12, FFQCFG()->preview_map_subs);
     CheckList->Check(13, FFQCFG()->dont_save_ffmpeg);
+    CheckList->Check(14, FFQCFG()->save_paths);
 
     //Center and update
     CenterOnParent();
@@ -318,6 +320,7 @@ bool FFQConfigEdit::Execute()
         FFQCFG()->confirm_delete_jobs = CheckList->IsChecked(11);
         FFQCFG()->preview_map_subs = CheckList->IsChecked(12);
         FFQCFG()->dont_save_ffmpeg = CheckList->IsChecked(13);
+        FFQCFG()->save_paths = CheckList->IsChecked(14);
 
         FFQCFG()->SaveConfig();
 
@@ -345,8 +348,9 @@ void FFQConfigEdit::OnButtonClick(wxCommandEvent& event)
         s = FFQCFG()->GetExecutableName(etENCODER, false);
         OpenDialog->SetFilename(FFQCFG()->GetExecutableName(etENCODER));
         OpenDialog->SetWildcard(s + "|" + s + "*");
-        OpenDialog->SetPath(FFMpegPath->GetValue());
-        if (OpenDialog->ShowModal() != wxID_CANCEL) FFMpegPath->SetValue(OpenDialog->GetPath());
+        FFQCFG()->FileDlgExecute("cfg.ffmpeg", OpenDialog, FFMpegPath, false);
+        //OpenDialog->SetPath(FFMpegPath->GetValue());
+        //if (OpenDialog->ShowModal() != wxID_CANCEL) FFMpegPath->SetValue(OpenDialog->GetPath());
 
     }
 
@@ -359,8 +363,9 @@ void FFQConfigEdit::OnButtonClick(wxCommandEvent& event)
         #endif // __WINDOWS__
         OpenDialog->SetFilename(s);
         OpenDialog->SetWildcard("VLC Media Player|" + s + "|*.*|*.*");
-        OpenDialog->SetPath(CustPlayer->GetValue());
-        if (OpenDialog->ShowModal() != wxID_CANCEL) CustPlayer->SetValue(OpenDialog->GetPath());
+        FFQCFG()->FileDlgExecute("cfg.player", OpenDialog, CustPlayer, false);
+        //OpenDialog->SetPath(CustPlayer->GetValue());
+        //if (OpenDialog->ShowModal() != wxID_CANCEL) CustPlayer->SetValue(OpenDialog->GetPath());
 
     }
 
